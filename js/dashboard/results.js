@@ -108,7 +108,6 @@
       }
       html += site.warnings.map((w) => `<p class="msg warn">${esc(w)}</p>`).join("");
       html += site.errors.map((w) => `<p class="msg bad">${esc(w)}</p>`).join("");
-      html += `<p class="hint">Measured in British National Grid (EPSG:27700) from the boundary's corner points.</p>`;
       el.innerHTML = html;
     },
 
@@ -122,9 +121,19 @@
       // answer comes first. A section the user opened stays open on updates.
       const wasOpen = new Set([...el.querySelectorAll("details.dash-sec[open]")].map((d) => d.id));
       const seen = el.querySelector("details.dash-sec") !== null;
-      const sec = (id, letter, title, body) => `<details class="dash-sec" id="dash-${id}"${id === "summary" || (seen ? wasOpen.has("dash-" + id) : false) ? " open" : ""}><summary><h3><span class="dash-letter">${letter}</span>${esc(title)}</h3></summary>${body}</details>`;
-      const block = (title, pillHtml, body) => `<div class="result"><div class="title"><span>${esc(title)}</span>${pillHtml || ""}</div>${body}</div>`;
-      const when = (d) => d ? `<p class="hint">Retrieved ${esc(fmtDate(d))}.</p>` : "";
+      // help: short explanation behind an "i" next to the section title.
+      const sec = (id, letter, title, body, help) => `<details class="dash-sec" id="dash-${id}"${id === "summary" || (seen ? wasOpen.has("dash-" + id) : false) ? " open" : ""}><summary><h3><span class="dash-letter">${letter}</span>${esc(title)}` +
+        (help ? `<button type="button" class="info" aria-expanded="false" aria-controls="help-dash-${id}" title="${esc(help)}" aria-label="About ${esc(title)}">i</button>` : "") +
+        `</h3></summary>${help ? `<p class="help" id="help-dash-${id}" hidden>${esc(help)}</p>` : ""}${body}</details>`;
+      // help: notes and the retrieval time, kept behind an "i" next to the title.
+      let tipN = 0;
+      const block = (title, pillHtml, body, help) => {
+        const id = help ? `help-b-${++tipN}` : "";
+        return `<div class="result"><div class="title"><span>${esc(title)}${help ? `<button type="button" class="info" aria-expanded="false" aria-controls="${id}" title="${esc(help)}" aria-label="More about ${esc(title)}">i</button>` : ""}</span>${pillHtml || ""}</div>` +
+          (help ? `<p class="help" id="${id}" hidden>${esc(help)}</p>` : "") + `${body}</div>`;
+      };
+      const whenText = (d) => (d ? `Retrieved ${fmtDate(d)}.` : "");
+      const dsHelp = (d) => [...(d.notes || []), whenText(d.retrieved)].filter(Boolean).join(" ");
       const byId = (id) => a && a.datasets.find((d) => d.id === id);
       const assessed = (d) => d && d.status !== "notAssessed";
       const datasetBody = (d) => {
@@ -135,8 +144,7 @@
           if (d.groups.length > 1 || g.group !== d.nation) h += `<p><strong>${esc(g.group)}</strong></p>`;
           h += `<p>${esc(groupFinding(g, d.noneText))}</p>` + analysisTable(g, d.noneText);
         });
-        h += d.notes.map((n) => `<p class="hint">${esc(n)}</p>`).join("");
-        return h + when(d.retrieved);
+        return h;
       };
       const pending = analysing
         ? `<p class="hint">Fetching flood polygons for the site and calculating intersections…</p>`
@@ -169,18 +177,17 @@
       const zoneSets = a ? a.datasets.filter((d) => d.primary) : [];
       if (a) {
         a.notes.forEach((n) => { B += `<p class="msg warn">${esc(n)}</p>`; });
-        zoneSets.filter(assessed).forEach((d) => { B += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d)); });
-        B += `<p class="hint">The mapped parts of the site are shaded on the map: darkest for the most severe class. Areas are measured in British National Grid. Overlapping polygons are counted once, in the more severe class.</p>`;
+        zoneSets.filter(assessed).forEach((d) => { B += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d), dsHelp(d)); });
       } else B += pending;
       if (res) {
         const z = zoneSummary(res);
-        B += block(res.fromSite ? "Flood zone at the site centroid" : "Flood zone at this point", pill(z.pill[0], z.pill[1]), `<p>${esc(z.text)}</p>` + when(res.zone && res.zone.retrieved));
+        B += block(res.fromSite ? "Flood zone at the site centroid" : "Flood zone at this point", pill(z.pill[0], z.pill[1]), `<p>${esc(z.text)}</p>`, whenText(res.zone && res.zone.retrieved));
         if (res.band || res.errors.band) {
           B += res.errors.band
             ? block("Long-term risk, rivers and sea (England)", pill("bad", "Service unavailable"), `<p>${esc(res.errors.band)}</p>`)
             : res.band.band
-              ? block("Long-term risk, rivers and sea (England)", pill("info", res.band.band), `<p>Environment Agency risk band at ${res.fromSite ? "the site centroid" : "this point"}, taking flood defences into account.</p>` + when(res.band.retrieved))
-              : block("Long-term risk, rivers and sea (England)", pill("info", "No band mapped"), `<p>No risk band was returned at this point. This is not a confirmed "very low" result: the service's point answers are not reliable, so check the risk band map layer.</p>` + when(res.band.retrieved));
+              ? block("Long-term risk, rivers and sea (England)", pill("info", res.band.band), `<p>Environment Agency risk band at ${res.fromSite ? "the site centroid" : "this point"}, taking flood defences into account.</p>`, whenText(res.band.retrieved))
+              : block("Long-term risk, rivers and sea (England)", pill("info", "No band mapped"), `<p>No risk band was returned at this point. This is not a confirmed "very low" result: the service's point answers are not reliable, so check the risk band map layer.</p>`, whenText(res.band.retrieved));
         }
       }
 
@@ -188,10 +195,10 @@
       let C = "";
       if (a) {
         a.datasets.filter((d) => !zoneSets.includes(d) && d.id !== "gw" && assessed(d))
-          .forEach((d) => { C += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d)); });
+          .forEach((d) => { C += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d), dsHelp(d)); });
         if (!C) C += `<p class="hint">Surface water, reservoir and recorded flood data are currently available for sites in England only.${a.nation === "Scotland" ? " For Scotland, surface water and coastal extents are part of the SEPA analysis in section B." : ""}</p>`;
         const gw = byId("gw");
-        if (gw) C += block("Groundwater flooding", pill(ANALYSIS_PILL.notAssessed, gw.statusText), `<p class="hint">${esc(gw.notes[0])}</p>`);
+        if (gw) C += block("Groundwater flooding", pill(ANALYSIS_PILL.notAssessed, gw.statusText), "", gw.notes[0]);
       } else C += pending;
 
       // D. Live environmental information
@@ -201,13 +208,12 @@
       else {
         if (res.errors.live) D += block("Flood warnings and alerts", pill("bad", "Service unavailable"), `<p>${esc(res.errors.live)}</p>`);
         else if (res.live) D += block(`Flood warnings and alerts within ${res.dist} km`, pill("info", res.live.length ? res.live.length + " in force" : "None in force"),
-          (res.live.length ? res.live.map((w) => `<p><strong>${esc(w.severity)}</strong>: ${esc(w.description)} <span class="hint">(raised ${esc(fmtDate(w.raised))})</span></p>`).join("") : `<p>No flood warnings or alerts in force.</p>`) + when(res.liveAt));
+          (res.live.length ? res.live.map((w) => `<p><strong>${esc(w.severity)}</strong>: ${esc(w.description)} <span class="hint">(raised ${esc(fmtDate(w.raised))})</span></p>`).join("") : `<p>No flood warnings or alerts in force.</p>`), whenText(res.liveAt));
         if (res.errors.gauges) D += block("River gauges", pill("bad", "Service unavailable"), `<p>${esc(res.errors.gauges)}</p>`);
         else if (res.gauges) D += block(`River gauges within ${res.dist} km`, pill("info", res.gauges.length ? res.gauges.length + " found" : "None found"),
           (res.gauges.length ? `<div class="tablewrap"><table class="data"><thead><tr><th>Gauge</th><th class="num">Distance</th><th class="num">Latest level</th><th>Reading time</th></tr></thead><tbody>` +
             res.gauges.map((g) => `<tr><td>${esc(g.name)}${g.river ? `<br><span class="hint">${esc(g.river)}</span>` : ""}</td><td class="num">${g.km.toFixed(1)} km</td><td class="num">${g.value != null ? g.value.toFixed(2) + " " + esc(g.unit || "m") : "-"}</td><td>${g.value != null ? esc(fmtDate(g.time)) : "No recent reading"}</td></tr>`).join("") +
-            `</tbody></table></div>` : `<p>No river level gauges in this radius.</p>`) + when(res.liveAt));
-        D += `<p class="hint">Live data is for ${res.fromSite ? "the site centroid" : "this point"}. Change the radius in the Report card.</p>`;
+            `</tbody></table></div>` : `<p>No river level gauges in this radius.</p>`), whenText(res.liveAt));
       }
 
       // Summary: risk by source and the next step (answer first).
@@ -222,7 +228,7 @@
           `<p class="hint">Guidance: ${fra.links.map(link).join(" · ")}. The local planning authority makes the final decision.</p></div>`;
         S += `<div class="tablewrap"><table class="data"><thead><tr><th>Source of flooding</th><th>Rating</th><th>Evidence</th></tr></thead><tbody>` +
           risk.map((r) => `<tr><td>${esc(r.source)}</td><td>${pill(r.level == null ? (r.rating === "No result" ? "bad" : "neutral") : "info", r.rating)}</td><td class="hint">${esc(r.evidence)}</td></tr>`).join("") +
-          `</tbody></table></div><p class="hint">None mapped means no mapped feature was found; it is not a confirmed low risk.${analysing ? " The site analysis is still running, so this summary will update." : ""}</p>`;
+          `</tbody></table></div>` + (analysing ? `<p class="hint">The site analysis is still running, so this summary will update.</p>` : "");
         const cn = FRC.assessment.climateNote(nation);
         S += `<p class="hint">${esc(cn.text)} ${link(cn.link)}</p>`;
       }
@@ -234,11 +240,14 @@
       if (res) dataStatus(res).forEach((r) => rows.push({ name: r.name + (res.fromSite ? " (site centroid)" : " (point)"), cls: r.status[0], status: r.status[1], when: r.when }));
       const E = `<div class="tablewrap"><table class="data status"><thead><tr><th>Dataset</th><th>Status</th></tr></thead><tbody>` +
         rows.map((r) => `<tr><td>${esc(r.name)}${r.why ? `<br><span class="hint">${esc(r.why)}</span>` : ""}${r.when ? `<br><span class="hint">Retrieved ${esc(fmtDate(r.when))}</span>` : ""}</td><td>${pill(r.cls, r.status)}</td></tr>`).join("") +
-        `</tbody></table></div><p class="hint">A missing map feature, unavailable service or empty result is not evidence that a site is free from flood risk, and never means Flood Zone 1.</p>`;
+        `</tbody></table></div>`;
 
-      el.innerHTML = (S ? sec("summary", "!", "Summary: risk by source and next step", S) : "") + sec("site", "A", "Site information", A) + sec("zones", "B", "Flood-zone assessment", B) +
-        sec("other", "C", "Additional flood information", C) + sec("live", "D", "Live environmental information", D) +
-        sec("status", "E", "Assessment status", E);
+      el.innerHTML = (S ? sec("summary", "!", "Summary: risk by source and next step", S, "None mapped means no mapped feature was found; it is not a confirmed low risk. The local planning authority makes the final decision on whether a Flood Risk Assessment is needed.") : "") +
+        sec("site", "A", "Site information", A) +
+        sec("zones", "B", "Flood-zone assessment", B, "The mapped parts of the site are shaded on the map: darkest for the most severe class. Areas are measured in British National Grid. Overlapping polygons are counted once, in the more severe class.") +
+        sec("other", "C", "Additional flood information", C) +
+        sec("live", "D", "Live environmental information", D, `Live data is for ${res && res.fromSite ? "the site centroid" : "the checked point"}. Change the search radius under More options in the Report card.`) +
+        sec("status", "E", "Assessment status", E, "A missing map feature, unavailable service or empty result is not evidence that a site is free from flood risk, and never means Flood Zone 1.");
     },
   };
 })(typeof window !== "undefined" ? window : globalThis);

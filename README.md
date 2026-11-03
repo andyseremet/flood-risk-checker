@@ -12,7 +12,7 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 
 | Step | What you can do |
 |---|---|
-| 1. Find the location | Search a UK postcode with the magnifier on the map (checked for the right format), or click the map to drop a pin. With no boundary of your own, the **600 m area around the pin** becomes the site and is checked straight away |
+| 1. Find the location | Search a UK postcode with the magnifier on the map (checked for the right format), or click the map to drop a pin. With no boundary of your own, the **600 m area around the pin** becomes the site. Nothing is fetched until you press **Check** under the map |
 | 2. Site boundary | Draw polygons or rectangles with the tools at the top left of the map (they replace the pin area), edit corners, delete, clear and redraw. Several parcels are supported |
 | | Import GeoJSON, KML or a zipped Shapefile with the folder button on the map. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |

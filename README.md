@@ -112,19 +112,17 @@ Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), P
 
 ## Releasing a change
 
-The page loads its scripts and styles with a version tag (`?v=1.0.0`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
+The page loads its scripts and styles with a version tag (`?v=1.0.0`), which is also shown in the page footer. Change it in `index.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
 
 ```bash
-sed -i 's/1\.0\.0/NEW/g' index.html diagnostics.html
+sed -i 's/1\.0\.0/NEW/g' index.html
 ```
 
 The polygon measurements run in a background worker (`js/analysis/analysis-worker.js`, started by `js/analysis/compute.js`) so detailed flood polygons cannot freeze the page. Exact clipping gets 15 seconds; if it runs over, the areas are estimated from sample points (30 seconds); if that also runs over, the dataset shows a processing error. Opened as a local file, the browser blocks workers and the measurements run on the page instead.
 
 ## Tests
 
-**In the browser, against the live services:** open `diagnostics.html` (linked from the Data connections card) and press **Run all tests**. Use it when a service seems to have changed. It runs the spec's phase 9 cases: service connections, what the live data contains (including the Wales zone field and the surface water band field), analysis of seven real sites (several classes, outside all zones, a large complex site, two parcels, a hole, Wales, Scotland), the GeoJSON, KML and Shapefile fixtures, export round trip, and an unreachable service and a timeout. It ends with a report to copy.
-
-**In Node, with fixed data:**
+The app has no build step and nothing to install. The checks below are for developers only.
 
 ```bash
 cd tests

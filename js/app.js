@@ -151,6 +151,9 @@
     ["Live warnings (Environment Agency)", () => FRC.util.getJSON(`${FRC.config.api.eaFlood}/id/floods?_limit=1`)],
     ["Flood zones (Environment Agency)", () => FRC.util.getJSON(`${FRC.config.api.eaZones}?f=json&limit=1`)],
     ["Risk band (Environment Agency)", () => FRC.ea.riskBand(53.959, -1.081)],
+    ["Surface water (Environment Agency)", () => FRC.ea.surfaceWaterAtPoint(53.959, -1.081)],
+    ["Reservoir extents (Environment Agency)", () => FRC.util.getJSON(`${FRC.config.api.eaReservoir}?f=json&limit=1`)],
+    ["Recorded floods (Environment Agency)", () => FRC.util.getJSON(`${FRC.config.api.eaRecorded}?f=json&limit=1`)],
     ["Flood zones (Natural Resources Wales)", () => FRC.nrw.zoneAtPoint(51.62, -3.94)],
     ["Flood maps (SEPA)", () => FRC.sepa.floodAtPoint(56.396, -3.437)],
   ];

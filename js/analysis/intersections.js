@@ -28,6 +28,12 @@
   const engine = {
     areaOf, intersect, union, difference, unionAll,
 
+    // The features (WGS84) that overlap the site by more than a sliver.
+    touching(siteGeomsWGS, features) {
+      const site = unionAll(siteGeomsWGS.map(toBNG));
+      return features.filter((f) => f.geometry && intersect(site, toBNG(f.geometry)));
+    },
+
     // siteGeomsWGS: array of Polygon/MultiPolygon geometries (parcels) in WGS84.
     // items: normalised flood polygons (WGS84) for ONE group, e.g. England.
     // Returns rows per class with exclusive area, % of site and overlap notes.

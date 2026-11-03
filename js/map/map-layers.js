@@ -35,6 +35,10 @@
       const layers = {
         ez: L.tileLayer.wms(A.eaZonesWms, { ...opts, layers: "Flood_Zones_2_3_Rivers_and_Sea" }),
         er: L.tileLayer.wms(A.eaRiskWms, { ...opts, layers: "rofrs_4band" }),
+        // The surface water service draws only at 1:50,000 or closer.
+        sw: L.tileLayer.wms(A.eaSurfaceWms, { ...opts, layers: "rofsw", minZoom: 14 }),
+        res: L.tileLayer.wms(A.eaReservoirWms, { ...opts, layers: "Reservoir_Flood_Extents_Wet_Day" }),
+        rec: L.tileLayer.wms(A.eaRecordedWms, { ...opts, layers: "Recorded_Flood_Outlines" }),
         w: L.tileLayer.wms(A.nrw, { ...opts, layers: A.nrwLayer }),
         s: sepaLayer(A.sepa, opts),
       };

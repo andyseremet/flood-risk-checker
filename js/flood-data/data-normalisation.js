@@ -18,6 +18,18 @@
       });
     },
 
+    // Reservoir flood extents: one class. The data carries no likelihood.
+    eaReservoir(features) {
+      return features.filter((f) => isPoly(f.geometry)).map((f) => (
+        { group: "England: Reservoir", key: "RES", label: "Reservoir flood extent (if a reservoir failed)", rank: 1, geometry: f.geometry }));
+    },
+
+    // Recorded flood outlines: one class. Areas that have flooded before.
+    eaRecorded(features) {
+      return features.filter((f) => isPoly(f.geometry)).map((f) => (
+        { group: "England: Recorded floods", key: "REC", label: "Recorded flood outline (flooded in the past)", rank: 1, geometry: f.geometry }));
+    },
+
     nrw(features) {
       return features.filter((f) => isPoly(f.geometry)).map((f) => {
         const p = f.properties || {};

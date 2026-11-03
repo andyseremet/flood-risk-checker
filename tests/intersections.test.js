@@ -141,4 +141,28 @@ test("When exact clipping fails, analyseGroup returns an estimate instead of an 
   } finally { FRC.intersections.exactGroup = exact; }
 });
 
+test("A huge valley-wide polygon (300,000 vertices) is cut to the site first and measured quickly", () => {
+  // A wavy ring about 20 km across around the site, with a straight edge
+  // through the middle of the site so half of it is covered.
+  const ring = [];
+  const n = 300000, cx = E0 + 50, cy = N0 + 50, r = 10000;
+  for (let i = 0; i < n; i++) {
+    const t = Math.PI / 2 + (Math.PI * i) / (n - 1); // left half-circle, top to bottom
+    const w = 1 + 0.02 * Math.sin(t * 4000);
+    ring.push([cx + r * w * Math.cos(t), cy + r * w * Math.sin(t)]);
+  }
+  ring.push([cx, cy - r], [cx, cy + r], ring[0]);
+  const big = P.geometryToWGS84({ type: "Polygon", coordinates: [ring] });
+  const items = FRC.normalise.eaReservoir([{ geometry: big, properties: {} }]);
+  const t0 = Date.now();
+  const res = FRC.intersections.exactGroup(site, items);
+  const ms = Date.now() - t0;
+  near(row(res, "RES").percent, 50, 0.5, "reservoir extent %");
+  assert.strictEqual(res.polygonsReturned, 1);
+  assert.ok(ms < 3000, `took ${ms} ms`);
+  const est = FRC.intersections.estimateGroup(site, items, null);
+  near(row(est, "RES").percent, 50, 2, "estimated %");
+  assert.strictEqual(FRC.intersections.touching(site, [{ geometry: big }]).length, 1);
+});
+
 console.log(`\n${passed} tests passed`);

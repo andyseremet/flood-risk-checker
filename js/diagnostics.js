@@ -48,6 +48,7 @@
   ];
 
   const results = [];
+  let running = false;
   const add = (group, title, verdict, detail, data) => {
     results.push({ group, title, verdict, detail, data });
     render();
@@ -62,6 +63,7 @@
   }
   function reportText() {
     const lines = [`Flood Risk Checker test run, ${new Date().toISOString()}, version ${root.FRC_VERSION || "?"}, ${navigator.userAgent}`,
+      running ? "STILL RUNNING: this report is incomplete. Wait for 'Finished' and copy again." : "Run complete.",
       `Measurements run ${FRC.compute && FRC.compute.usingWorker ? "in a background worker" : "on the page"}.`, $("progress").textContent, $("summary").textContent, ""];
     results.forEach((r) => {
       lines.push(`[${r.verdict}] ${r.group}: ${r.title}`);
@@ -132,6 +134,28 @@
         return [layers.length ? "Pass" : "Check", [`Layers: ${layers.join(", ") || "none found"}.`, `Point query formats: ${formats.join(", ") || "none listed"}.`], { layers, formats }];
       });
     }
+    // Other ways the same NaFRA2 data may be published (feature APIs),
+    // in case the map-image point query stays empty.
+    for (const [title, wms] of [["EA risk band data, other access routes", FRC.config.api.eaRiskWms], ["EA surface water data, other access routes", FRC.config.api.eaSurfaceWms]]) {
+      const base = wms.replace(/\/wms$/, "");
+      await probe(title, async () => {
+        const get = async (u) => {
+          const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 20000);
+          try { const res = await fetch(u, { signal: ctrl.signal }); const text = await res.text(); return res.ok ? text : "HTTP " + res.status; }
+          catch (e) { return "error: " + e.message; } finally { clearTimeout(t); }
+        };
+        const ogc = await get(`${base}/ogc/features/v1/collections?f=json`);
+        const wfs = await get(`${base}/wfs?service=WFS&request=GetCapabilities`);
+        return { ogc, wfs };
+      }, ({ ogc, wfs }) => {
+        let cols = [];
+        try { cols = (JSON.parse(ogc).collections || []).map((c) => c.id); } catch { /* not JSON */ }
+        const types = [...wfs.matchAll(/<(?:wfs:)?FeatureType>\s*<(?:wfs:)?Name>([^<]+)<\//g)].map((m) => m[1]);
+        return [cols.length || types.length ? "Pass" : "Check", [
+          `OGC API collections: ${cols.join(", ") || ogc.slice(0, 80)}.`,
+          `WFS feature types: ${types.join(", ") || wfs.slice(0, 80)}.`], { cols, types }];
+      });
+    }
     await probe("EA reservoir extent fields (York)", () => FRC.ea.reservoirInBox(york), (r) => [
       r.features.length ? (keysOf(r.features[0]).includes("reservoir") ? "Pass" : "Check") : "Check",
       [`${r.features.length} extents. Fields: ${keysOf(r.features[0]).join(", ") || "none returned"}.`], { names: r.features.slice(0, 5).map((f) => f.properties && f.properties.reservoir) }]);
@@ -171,16 +195,26 @@
     return [problems.length ? "Fail" : missed.length ? "Check" : "Pass", [...problems, ...missed, ...detail], data];
   }
 
+  // Each site gets up to 3 minutes. The progress line names the datasets
+  // still running, so a slow one shows up in the report.
+  const SITE_LIMIT = 180000;
   async function sites() {
     for (const [i, site] of SITES.entries()) {
-      $("progress").textContent = `Analysing site ${i + 1} of ${SITES.length}: ${site.title.split(": ").pop()}…`;
-      render();
+      const label = `Analysing site ${i + 1} of ${SITES.length}: ${site.title.split(": ").pop()}`;
+      const started = performance.now();
+      let waiting = [];
+      const show = () => { $("progress").textContent = `${label}. ${Math.round((performance.now() - started) / 1000)} s${waiting.length ? ", waiting for " + waiting.join(", ") : ""}…`; render(); };
+      show();
+      const tick = setInterval(show, 5000);
       await new Promise((r) => setTimeout(r, 0));
       try {
-        const [a, ms] = await timed(() => FRC.floodAnalysis.analyseSite(site.features(), site.nation));
+        let timer;
+        const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`no result after ${SITE_LIMIT / 60000} minutes; still waiting for ${waiting.join(", ") || "unknown"}`)), SITE_LIMIT); });
+        const [a, ms] = await timed(() => Promise.race([FRC.floodAnalysis.analyseSite(site.features(), site.nation, (left) => { waiting = left; show(); }), limit]).finally(() => clearTimeout(timer)));
         const [verdict, detail, data] = checkAnalysis(site, a, ms);
         add("Site analysis", site.title, verdict, detail, data);
       } catch (e) { add("Site analysis", site.title, "Fail", ["The analysis stopped: " + e.message]); }
+      finally { clearInterval(tick); }
     }
   }
 
@@ -232,11 +266,13 @@
   async function run() {
     results.length = 0; render();
     const btn = $("runBtn"); btn.disabled = true;
+    running = true; $("copyBtn").textContent = "Copy report so far (still running)";
     const steps = [["Checking connections…", connections], ["Reading live data…", discovery], ["Analysing real sites (this can take a minute)…", sites], ["Testing imports…", imports], ["Testing failures…", failures]];
     for (const [msg, fn] of steps) { $("progress").textContent = msg; render(); await fn(); }
+    running = false;
     $("progress").textContent = "Finished. Copy the report below and send it back.";
     render();
-    btn.disabled = false;
+    btn.disabled = false; $("copyBtn").textContent = "Copy report";
   }
 
   FRC.diagnostics = { run, SITES, FIXTURES, square };
@@ -245,7 +281,7 @@
     $("copyBtn").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText($("report").value); $("copyBtn").textContent = "Copied"; }
       catch { $("report").select(); $("copyBtn").textContent = "Press Ctrl+C to copy"; }
-      setTimeout(() => ($("copyBtn").textContent = "Copy report"), 2500);
+      setTimeout(() => ($("copyBtn").textContent = running ? "Copy report so far (still running)" : "Copy report"), 2500);
     });
   });
 })(window);

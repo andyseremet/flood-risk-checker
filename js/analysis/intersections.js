@@ -65,17 +65,52 @@
     try { return snap(T().bboxClip(f, box)); } catch { return f; }
   }
 
+  // Flood polygons can be enormous: a reservoir flood extent follows a whole
+  // river valley, with hundreds of thousands of vertices. Projecting all of
+  // them to BNG and clipping them took minutes at York. So each polygon is
+  // first cut to the site's box in WGS84 (plus about 100 m), which is cheap
+  // and leaves only the part near the site.
+  const PAD_DEG = 0.0015;
+  function wgsBox(siteGeomsWGS) {
+    let a = [Infinity, Infinity, -Infinity, -Infinity];
+    siteGeomsWGS.forEach((g) => FRC.projections.mapCoords(g, (c) => {
+      a = [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[2], c[0]), Math.max(a[3], c[1])];
+      return c;
+    }));
+    return [a[0] - PAD_DEG, a[1] - PAD_DEG, a[2] + PAD_DEG, a[3] + PAD_DEG];
+  }
+  function preclipGeom(g, box) {
+    if (!g || (g.type !== "Polygon" && g.type !== "MultiPolygon")) return g;
+    let n = 0;
+    (g.type === "Polygon" ? [g.coordinates] : g.coordinates).forEach((p) => p.forEach((r) => { n += r.length; }));
+    if (n < 2000) return g; // small enough already
+    try {
+      const out = T().bboxClip(feat(g), box).geometry;
+      const polys = (out.type === "Polygon" ? [out.coordinates] : out.coordinates)
+        .map((p) => p.filter((r) => r.length >= 4)).filter((p) => p.length);
+      if (!polys.length) return null;
+      return polys.length === 1 ? { type: "Polygon", coordinates: polys[0] } : { type: "MultiPolygon", coordinates: polys };
+    } catch { return g; }
+  }
+  const preclip = (siteGeomsWGS, items) => {
+    const box = wgsBox(siteGeomsWGS);
+    return items.map((it) => ({ ...it, geometry: preclipGeom(it.geometry, box) })).filter((it) => it.geometry);
+  };
+
   const engine = {
+    preclip,
     areaOf, intersect, union, difference, unionAll, snap,
 
     // The features (WGS84) that overlap the site by more than a sliver.
     touching(siteGeomsWGS, features) {
       const site = unionAll(siteGeomsWGS.map(toBNG));
       const sb = T().bbox(site), box = [sb[0] - 1, sb[1] - 1, sb[2] + 1, sb[3] + 1];
+      const wbox = wgsBox(siteGeomsWGS);
       return features.filter((f) => {
-        if (!f.geometry) return false;
-        try { return Boolean(intersect(site, clipToBox(toBNG(f.geometry), box))); } catch {
-          try { return engine.estimateGroup(siteGeomsWGS, [{ key: "x", label: "x", rank: 1, geometry: f.geometry }], null, 2000).coveredArea > MIN_AREA; } catch { return false; }
+        const g = preclipGeom(f.geometry, wbox);
+        if (!g) return false;
+        try { return Boolean(intersect(site, clipToBox(toBNG(g), box))); } catch {
+          try { return engine.estimateGroup(siteGeomsWGS, [{ key: "x", label: "x", rank: 1, geometry: g }], null, 2000).coveredArea > MIN_AREA; } catch { return false; }
         }
       });
     },
@@ -97,7 +132,8 @@
     // and give each point inside the site to the most severe class whose
     // polygon contains it. Area = share of points x site area. Accurate to
     // roughly the grid spacing along each boundary (about 1% for 10,000 points).
-    estimateGroup(siteGeomsWGS, items, cause, target = 10000) {
+    estimateGroup(siteGeomsWGS, allItems, cause, target = 10000) {
+      const items = preclip(siteGeomsWGS, allItems);
       const parcels = siteGeomsWGS.map(toBNG).filter(Boolean);
       if (!parcels.length) throw new Error("The site boundary has no area to analyse.");
       let siteArea;
@@ -138,7 +174,7 @@
       const overlaps = rows.filter((r) => r.rawArea - r.area > MIN_AREA).map((r) => ({ key: r.key, label: r.label, area: r.rawArea - r.area }));
       const coveredArea = share(coveredN), remainingArea = Math.max(0, siteArea - coveredArea);
       return {
-        siteArea, rows, polygonsReturned: items.length, coveredArea,
+        siteArea, rows, polygonsReturned: allItems.length, coveredArea,
         coveredPercent: (100 * coveredN) / total, remainingArea, remainingPercent: 100 - (100 * coveredN) / total,
         remainingGeometry: null, overlaps,
         extent: coveredN === 0 ? "none" : coveredN === total ? "whole" : "part",
@@ -146,7 +182,8 @@
       };
     },
 
-    exactGroup(siteGeomsWGS, items) {
+    exactGroup(siteGeomsWGS, allItems) {
+      const items = preclip(siteGeomsWGS, allItems);
       const site = unionAll(siteGeomsWGS.map(toBNG));
       const siteArea = areaOf(site);
       if (!site || siteArea <= 0) throw new Error("The site boundary has no area to analyse.");
@@ -181,7 +218,7 @@
       return {
         siteArea,
         rows: rows.filter((r) => r.rawArea > MIN_AREA),
-        polygonsReturned: items.length,
+        polygonsReturned: allItems.length,
         coveredArea,
         coveredPercent: (100 * coveredArea) / siteArea,
         remainingArea,

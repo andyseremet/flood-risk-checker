@@ -55,7 +55,17 @@
         // Note a layer whose map tiles fail to load, so the error log can show it
         // and Try again can draw it again.
         const name = box.parentElement.textContent.replace(/, shows when zoomed in close/, "").trim();
-        layers[k].on("tileerror", () => {
+        layers[k].on("tileerror", (e) => {
+          // A map image that fails is asked for once more by itself, a moment
+          // later (phones often drop a few when many layers load at once).
+          // Only a second failure is logged.
+          const img = e.tile;
+          if (img && !img._frcRetried && img.src) {
+            img._frcRetried = true;
+            const src = img.src;
+            setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "_retry=1"; }, 1500 + Math.random() * 1500);
+            return;
+          }
           if (FRC.mapLayers.tileErrors[k]) return;
           FRC.mapLayers.tileErrors[k] = name;
           if (FRC.mapLayers.onTileError) FRC.mapLayers.onTileError();

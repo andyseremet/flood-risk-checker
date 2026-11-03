@@ -6,16 +6,17 @@
 
   FRC.sepa = {
     // Flood extent polygons from each SEPA layer that intersect the box.
-    // A layer that fails (the live service refused surface water layer 3
-    // with "Failed to execute query") is retried once with simplified
-    // geometry. If it still fails, the other layers are kept and the result
+    // Only the PROB field is asked for: the surface water layers (3 to 5)
+    // have no OBJECTID field (their id field is "fid"), so asking for
+    // OBJECTID made SEPA answer "Failed to execute query" for them.
+    // A layer that still fails is retried once with simplified geometry. If it still fails, the other layers are kept and the result
     // is marked partial with a note naming the missing layer.
     async extentsInBox(bbox) {
       const layerIds = Object.keys(FRC.config.sepaLayers).map(Number);
       const query = async (id, simplify) => {
         const params = new URLSearchParams({
           geometry: bbox.join(","), geometryType: "esriGeometryEnvelope", inSR: "4326",
-          spatialRel: "esriSpatialRelIntersects", outFields: "OBJECTID", returnGeometry: "true",
+          spatialRel: "esriSpatialRelIntersects", outFields: "PROB", returnGeometry: "true",
           outSR: "4326", f: "geojson",
         });
         if (simplify) params.set("maxAllowableOffset", "0.000005"); // about 0.5 m

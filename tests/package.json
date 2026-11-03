@@ -2,6 +2,6 @@
   "name": "flood-risk-checker-tests",
   "private": true,
   "description": "Geometry tests for the Flood Risk Checker. The app itself needs no install.",
-  "scripts": { "test": "node geometry.test.js", "fixtures": "node make-fixtures.js" },
+  "scripts": { "test": "node geometry.test.js && node intersections.test.js", "fixtures": "node make-fixtures.js" },
   "devDependencies": { "@turf/turf": "6.5.0", "proj4": "2.9.2" }
 }

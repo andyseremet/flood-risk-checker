@@ -10,6 +10,8 @@
     checkSequence: 0,   // stops a slow, older check overwriting a newer one
     site: { features: [], measured: null, warnings: [], errors: [] },
     importNotes: [],    // messages from the last import, kept until the site is cleared
+    analysis: null,     // last site-wide flood-zone analysis (cleared when the site changes)
+    analysisSeq: 0,
   };
   FRC.state = state;
 
@@ -24,6 +26,12 @@
         `${site.measured.parcels[o.i].name} and ${site.measured.parcels[o.j].name} overlap by ${FRC.util.fmtNum(o.area, 0)} m². The site area counts that overlap twice.`));
     }
     state.site = site;
+    // Any change to the boundary makes the previous analysis out of date.
+    state.analysisSeq++;
+    state.analysis = null;
+    FRC.map.showAnalysis(null);
+    FRC.results.renderAnalysis($("analysis"), null);
+    $("analysisCard").hidden = true;
     FRC.results.renderSite($("siteInfo"), site);
     const has = site.features.length > 0;
     $("exportBtn").disabled = !has;
@@ -96,6 +104,30 @@
     $("pdfBtn").disabled = false;
   }
 
+  // Point checks at the centroid, then the site-wide flood-zone intersection.
+  async function runSiteCheck() {
+    const m = state.site.measured;
+    if (!m || !m.centroidWGS) return;
+    const seq = ++state.analysisSeq;
+    const features = state.site.features;
+    $("analysisCard").hidden = false;
+    $("analysis").innerHTML = `<p class="hint">Fetching flood zone polygons for the site and calculating intersections…</p>`;
+    $("siteCheckBtn").disabled = true;
+    try {
+      await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
+      const nation = state.current ? state.current.nation : "Unknown";
+      const a = await FRC.floodAnalysis.analyseSite(features, nation);
+      if (seq !== state.analysisSeq) return; // the boundary changed while we waited
+      state.analysis = a;
+      FRC.results.renderAnalysis($("analysis"), a);
+      FRC.map.showAnalysis(a);
+    } catch (e) {
+      if (seq === state.analysisSeq) $("analysis").innerHTML = `<p class="msg bad">${esc("The site analysis could not be completed: " + e.message)}</p>`;
+    } finally {
+      $("siteCheckBtn").disabled = !state.site.features.length;
+    }
+  }
+
   async function searchPostcode(pc) {
     pc = String(pc || "").trim();
     if (!pc) return;
@@ -147,10 +179,7 @@
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());
     $("importInput").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ""; });
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
-    $("siteCheckBtn").addEventListener("click", () => {
-      const m = state.site.measured;
-      if (m && m.centroidWGS) runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
-    });
+    $("siteCheckBtn").addEventListener("click", runSiteCheck);
     $("siteInfo").addEventListener("click", (e) => {
       const z = e.target.closest("[data-zoom]"), r = e.target.closest("[data-remove]");
       const layers = FRC.boundaryDraw.layers();
@@ -161,9 +190,9 @@
     $("pdfBtn").addEventListener("click", async () => {
       const btn = $("pdfBtn"); btn.disabled = true; btn.textContent = "Building PDF…";
       try {
-        await FRC.pdfReport.build(state.current, state.site, {
+        await FRC.pdfReport.build(state.current, state.site, state.analysis, {
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), notes: $("notes").value.trim(),
-          sections: { location: $("o-location").checked, map: $("o-map").checked, site: $("o-site").checked, zone: $("o-zone").checked, band: $("o-band").checked, live: $("o-live").checked, gauges: $("o-gauges").checked },
+          sections: { location: $("o-location").checked, map: $("o-map").checked, site: $("o-site").checked, intersect: $("o-intersect").checked, zone: $("o-zone").checked, band: $("o-band").checked, live: $("o-live").checked, gauges: $("o-gauges").checked },
         });
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
       btn.disabled = false; btn.textContent = "Download PDF report";
@@ -174,6 +203,6 @@
     testConnections();
   }
 
-  FRC.app = { start, runCheck, searchPostcode, importFile, recomputeSite };
+  FRC.app = { start, runCheck, runSiteCheck, searchPostcode, importFile, recomputeSite };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })(window);

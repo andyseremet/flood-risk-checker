@@ -16,7 +16,8 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 | 2. Site boundary | Draw polygons or rectangles, edit corners, delete, clear and redraw. Several parcels are supported |
 | | Import GeoJSON, KML or a zipped Shapefile. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |
-| 3. Flood data | Flood zone, long-term risk band, live warnings and river gauges at the site centroid or clicked point |
+| 3. Site flood-zone analysis | **Analyse site** intersects the boundary with flood zone polygons and gives the area and % of the site in each zone, in a table and on the map |
+| | Flood zone, long-term risk band, live warnings and river gauges at the site centroid or a clicked point |
 | 4. Report | PDF with the sections you tick, data status, sources and limitations |
 
 The **Data connections** panel tests each public service when the page opens.
@@ -28,6 +29,25 @@ Boundaries are kept in WGS84 (EPSG:4326) for the map and GeoJSON. For measuring,
 - Holes are subtracted from the area. The perimeter is the outer boundary only.
 - Parcels that overlap each other are flagged, because the overlap would be counted twice.
 - Files in British National Grid (common from QGIS) are detected and converted automatically.
+
+## How the site analysis works
+
+1. The site's bounding box is used to fetch flood polygons from the agency for the site's nation: EA Flood Zones 2 and 3 (OGC API, following its "next" pages), NRW Flood Map for Planning (WFS), or SEPA river, surface water and coastal extents (ArcGIS query, layers 0 to 8).
+2. Each agency's own classes are kept: Flood Zones in England and Wales, likelihood bands (high, medium, low) for each source in Scotland.
+3. The site parcels and the flood polygons are converted to British National Grid and intersected with Turf.
+4. Polygons of the same class are merged, so overlaps count once. Classes are then made exclusive from most to least severe, so land in both a Zone 2 and a Zone 3 polygon counts once, as Zone 3. That overlap is reported.
+5. Land with no mapped polygon is shown as "No Flood Zone 2 or 3 polygon mapped". It is never called Flood Zone 1.
+
+Each dataset gets a status: Analysis completed, No mapped feature identified, Partial coverage (the service's result limit was reached), Not assessed, Service unavailable or Processing error.
+
+| Example (from the spec) | Area | Site |
+|---|---|---|
+| Flood Zone 3 | 2,000 m² | 20% |
+| Flood Zone 2 | 2,000 m² | 20% |
+| No Flood Zone 2 or 3 polygon mapped | 6,000 m² | 60% |
+| Total site | 10,000 m² | 100% |
+
+This exact case is one of the automated tests.
 
 ## Validation
 
@@ -55,13 +75,16 @@ js/
   app.js                        wires the modules together
   map/map.js, map-layers.js     basemap, marker, flood overlays
   location/location-search.js   postcodes.io lookups
+  analysis/intersections.js     polygon intersection and area engine
+  analysis/flood-analysis.js    fetches, normalises and analyses each dataset
   boundary/                     draw, import, export, validation
   geometry/                     projections (Proj4js), measurements
-  flood-data/                   environment-agency, natural-resources-wales, sepa
+  flood-data/                   environment-agency, natural-resources-wales, sepa, data-normalisation
   dashboard/results.js          results and data status panels
   reporting/pdf-report.js       PDF report
 tests/
   geometry.test.js              measurement and validation tests
+  intersections.test.js         flood-zone intersection tests
   make-fixtures.js              builds the test boundaries
   fixtures/                     GeoJSON, KML and zipped Shapefile with known areas
 ```
@@ -80,11 +103,14 @@ npm install
 npm test
 ```
 
-The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon) and check that invalid shapes are rejected.
+The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon), check that invalid shapes are rejected, and check the flood-zone intersections (the 60/20/20 example, a site outside all zones, a whole site in Zone 3, overlapping polygons, overlapping parcels, a site with a hole, and SEPA likelihood bands).
 
 ## Known limitations
 
-- Flood data is still checked at one point (the site centroid). Working out how much of the site falls in each flood zone is the next phase.
+- The long-term risk band, live warnings and gauges are still point checks at the site centroid.
+- The site's nation comes from its centroid. A site that crosses the England/Wales or England/Scotland border is analysed only against the centroid's agency.
+- The NRW layer's zone field has not been confirmed against live data. Polygons whose zone can't be read are shown as "zone not stated".
+- Very large sites can hit a service's result limit. This is reported as Partial coverage.
 - Address search is not supported yet, only postcodes.
 - The BNG conversion uses a standard 7-parameter shift, accurate to a few metres. Grid areas can differ from ground areas by up to about 0.1%.
 - KMZ files are not supported. Save as KML instead.

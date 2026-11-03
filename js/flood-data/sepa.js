@@ -5,6 +5,27 @@
   const FRC = (root.FRC = root.FRC || {});
 
   FRC.sepa = {
+    // Flood extent polygons from each SEPA layer that intersect the box.
+    async extentsInBox(bbox) {
+      const layerIds = Object.keys(FRC.config.sepaLayers).map(Number);
+      const results = await Promise.all(layerIds.map(async (id) => {
+        const params = new URLSearchParams({
+          geometry: bbox.join(","), geometryType: "esriGeometryEnvelope", inSR: "4326",
+          spatialRel: "esriSpatialRelIntersects", outFields: "OBJECTID", returnGeometry: "true",
+          outSR: "4326", f: "geojson",
+        });
+        const r = await FRC.util.getJSON(`${FRC.config.api.sepa}/${id}/query?${params}`, 30000);
+        if (r.error) throw new Error((r.error.message || "query failed") + " (layer " + id + ")");
+        const partial = Boolean(r.exceededTransferLimit || (r.properties && r.properties.exceededTransferLimit));
+        return { id, features: (r.features || []).map((f) => ({ ...f, properties: { ...(f.properties || {}), sepaLayer: id } })), partial };
+      }));
+      return {
+        features: results.flatMap((r) => r.features),
+        partial: results.some((r) => r.partial),
+        retrieved: new Date(),
+      };
+    },
+
     // Returns e.g. { found: { River: "Medium", Coastal: "Low" }, retrieved }
     async floodAtPoint(lat, lon) {
       const d = 0.01;

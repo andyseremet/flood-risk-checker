@@ -112,13 +112,17 @@ Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), P
 
 ## Releasing a change
 
-The page loads its scripts and styles with a version tag (`?v=2026-11-03.9`), which is also shown in the page footer. Change it in `index.html` with each release so browsers fetch the new files instead of a cached copy:
+The page loads its scripts and styles with a version tag (`?v=2026-11-03.10`), which is also shown in the page footer. Change it in `index.html` with each release so browsers fetch the new files instead of a cached copy:
 
 ```bash
 sed -i 's/?v=[0-9.-]*"/?v=NEW"/g; s/Version [0-9.-]*\./Version NEW./' index.html
 ```
 
 ## Tests
+
+**In the browser, against the live services:** open `diagnostics.html` (linked from the Data connections card) and press **Run all tests**. It runs the spec's phase 9 cases: service connections, what the live data contains (including the Wales zone field and the surface water band field), analysis of seven real sites (several classes, outside all zones, a large complex site, two parcels, a hole, Wales, Scotland), the GeoJSON, KML and Shapefile fixtures, export round trip, and an unreachable service and a timeout. It ends with a report to copy.
+
+**In Node, with fixed data:**
 
 ```bash
 cd tests

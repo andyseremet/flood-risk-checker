@@ -110,6 +110,14 @@ The scripts are plain `<script>` files rather than ES modules, so the page also 
 
 Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), Proj4js 2.9.2, shpjs 4.0.4 (zipped Shapefiles, including the .prj), jsPDF 2.5.1 and html2canvas 1.4.1. KML is read with the browser's built-in DOMParser.
 
+## Releasing a change
+
+The page loads its scripts and styles with a version tag (`?v=2026-11-03.9`), which is also shown in the page footer. Change it in `index.html` with each release so browsers fetch the new files instead of a cached copy:
+
+```bash
+sed -i 's/?v=[0-9.-]*"/?v=NEW"/g; s/Version [0-9.-]*\./Version NEW./' index.html
+```
+
 ## Tests
 
 ```bash
@@ -129,6 +137,7 @@ The tests measure boundaries with known areas (a 100 m square in BNG, a square w
 - Very large sites can hit a service's result limit. This is reported as Partial coverage.
 - Address search is not supported yet, only postcodes.
 - The BNG conversion uses a standard 7-parameter shift, accurate to a few metres. Grid areas can differ from ground areas by up to about 0.1%.
+- If a dataset's polygons are too complex for exact clipping, its areas are estimated from about 10,000 sample points (roughly 1 to 2% error), marked "areas estimated", and not shaded on the map.
 - KMZ files are not supported. Save as KML instead.
 
 ## Licence and credits

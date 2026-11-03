@@ -108,3 +108,4 @@ table.data.status .pill { white-space: normal; }
 .dashboard .pill { border-radius: 8px; text-align: center; }
 .dashboard .result .title .pill { flex: none; max-width: 45%; align-self: flex-start; }
 table.data.status td:nth-child(2) { width: 8.5em; }
+.nowrap { white-space: nowrap; }

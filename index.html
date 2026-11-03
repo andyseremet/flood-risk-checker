@@ -89,8 +89,11 @@
   </div>
   <div id="mapwrap">
     <div id="map" aria-label="Map"></div>
-    <div class="legend" id="legend">
-      <strong>Map layers</strong>
+    <button type="button" class="layers-toggle" id="layersToggle" aria-controls="legend" aria-expanded="false" title="Map layers" aria-label="Show map layers">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3 2 8.5l10 5.5 10-5.5L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m2 12.5 10 5.5 10-5.5M2 16.5 12 22l10-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="legend" id="legend" hidden>
+      <div class="legend-head"><strong>Map layers</strong><button type="button" class="link" id="layersClose" aria-label="Hide map layers">Close</button></div>
       <span><span class="site-swatch"></span>Site boundary</span>
       <span><span class="swatch" style="background:#1f4e99"></span>Site in Zone 3 / high likelihood</span>
       <span><span class="swatch" style="background:#5b8fd6"></span>Site in Zone 2 / medium likelihood</span>

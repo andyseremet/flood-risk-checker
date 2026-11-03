@@ -64,7 +64,10 @@ label.opt { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
 label.opt input { margin-top: 3px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .grid2 label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-.legend { position: absolute; z-index: 500; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 24px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; max-width: 220px; }
+.layers-toggle { position: absolute; z-index: 600; top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); width: 40px; height: 40px; padding: 0; display: grid; place-items: center; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); }
+.layers-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.legend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.legend { position: absolute; z-index: 500; right: max(10px, env(safe-area-inset-right, 0px)); top: 56px; max-height: calc(100% - 90px); overflow-y: auto; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; max-width: 220px; }
 .legend label { display: flex; gap: 6px; align-items: center; }
 footer.note { font-size: 12px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

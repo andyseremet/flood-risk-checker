@@ -269,10 +269,27 @@
       else placePin(e.latlng.lat, e.latlng.lng);
     });
     // "i" buttons: click shows or hides the help text they point to.
+    let helpOpenedAt = 0;
     document.querySelectorAll("button.info, button.info-btn").forEach((b) => b.addEventListener("click", () => {
       const t = $(b.getAttribute("aria-controls"));
-      const open = t.hidden; t.hidden = !open; b.setAttribute("aria-expanded", String(open));
+      const open = t.hidden;
+      // One note at a time.
+      document.querySelectorAll("button.info[aria-expanded=true], button.info-btn[aria-expanded=true]").forEach((o) => { if (o !== b) { $(o.getAttribute("aria-controls")).hidden = true; o.setAttribute("aria-expanded", "false"); } });
+      t.hidden = !open; b.setAttribute("aria-expanded", String(open));
+      helpOpenedAt = Date.now();
     }));
+    // Help notes stay open only while the user is reading them: moving the
+    // map, scrolling, or pressing or tapping anything else closes them.
+    const closeHelp = () => document.querySelectorAll("button.info[aria-expanded=true], button.info-btn[aria-expanded=true]").forEach((b) => {
+      $(b.getAttribute("aria-controls")).hidden = true; b.setAttribute("aria-expanded", "false");
+    });
+    document.addEventListener("click", (e) => { if (!e.target.closest("button.info, button.info-btn, .help")) closeHelp(); }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(); });
+    map.on("movestart zoomstart", closeHelp);
+    // Scrolling closes notes, but not the small scroll that can follow opening one.
+    const onScroll = () => { if (Date.now() - helpOpenedAt > 600) closeHelp(); };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    $("side").addEventListener("scroll", onScroll, { passive: true });
     // Postcode search opens from the search button on the map.
     const openSearch = (open) => {
       $("searchPanel").hidden = !open; $("searchToggle").setAttribute("aria-expanded", String(open));

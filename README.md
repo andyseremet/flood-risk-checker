@@ -4,7 +4,7 @@ A prototype flood risk checker for analysts in the UK. Enter a postcode or click
 
 ## Run it
 
-Live at https://andyseremet.github.io/flood-risk-checker/ , or open `index.html` in a browser. It needs an internet connection, because it calls public flood data services and loads three libraries from cdnjs: Leaflet (map), jsPDF (PDF) and html2canvas (map image in the PDF).
+Use it at https://andyseremet.github.io/flood-risk-checker/ or open `index.html` in a browser. It needs an internet connection, because it calls public flood data services and loads three libraries from cdnjs: Leaflet (map), jsPDF (PDF) and html2canvas (map image in the PDF).
 
 ## What it shows
 

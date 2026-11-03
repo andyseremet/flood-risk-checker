@@ -112,11 +112,13 @@ Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), P
 
 ## Releasing a change
 
-The page loads its scripts and styles with a version tag (`?v=2026-11-03.10`), which is also shown in the page footer. Change it in `index.html` with each release so browsers fetch the new files instead of a cached copy:
+The page loads its scripts and styles with a version tag (`?v=2026-11-03.11`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
 
 ```bash
-sed -i 's/?v=[0-9.-]*"/?v=NEW"/g; s/Version [0-9.-]*\./Version NEW./' index.html
+sed -i 's/2026-11-03\.11/NEW/g' index.html diagnostics.html
 ```
+
+The polygon measurements run in a background worker (`js/analysis/analysis-worker.js`, started by `js/analysis/compute.js`) so detailed flood polygons cannot freeze the page. Exact clipping gets 15 seconds; if it runs over, the areas are estimated from sample points (30 seconds); if that also runs over, the dataset shows a processing error. Opened as a local file, the browser blocks workers and the measurements run on the page instead.
 
 ## Tests
 

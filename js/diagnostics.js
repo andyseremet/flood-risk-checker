@@ -61,7 +61,8 @@
     $("report").value = reportText();
   }
   function reportText() {
-    const lines = [`Flood Risk Checker test run, ${new Date().toISOString()}, version ${root.FRC_VERSION || "?"}, ${navigator.userAgent}`, $("summary").textContent, ""];
+    const lines = [`Flood Risk Checker test run, ${new Date().toISOString()}, version ${root.FRC_VERSION || "?"}, ${navigator.userAgent}`,
+      `Measurements run ${FRC.compute && FRC.compute.usingWorker ? "in a background worker" : "on the page"}.`, $("progress").textContent, $("summary").textContent, ""];
     results.forEach((r) => {
       lines.push(`[${r.verdict}] ${r.group}: ${r.title}`);
       r.detail.forEach((d) => lines.push("    " + d));
@@ -158,7 +159,9 @@
   }
 
   async function sites() {
-    for (const site of SITES) {
+    for (const [i, site] of SITES.entries()) {
+      $("progress").textContent = `Analysing site ${i + 1} of ${SITES.length}: ${site.title.split(": ").pop()}…`;
+      await new Promise((r) => setTimeout(r, 0));
       try {
         const [a, ms] = await timed(() => FRC.floodAnalysis.analyseSite(site.features(), site.nation));
         const [verdict, detail, data] = checkAnalysis(site, a, ms);

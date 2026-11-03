@@ -118,7 +118,11 @@
     renderDashboard(el, { site, current: res, analysis: a, siteName, analysing, analysisError }) {
       const hasSite = site && site.features.length > 0;
       if (!hasSite && !res) { el.innerHTML = ""; return; }
-      const sec = (id, letter, title, body) => `<details class="dash-sec" id="dash-${id}" open><summary><h3><span class="dash-letter">${letter}</span>${esc(title)}</h3></summary>${body}</details>`;
+      // The summary is open; the detailed sections start folded so the
+      // answer comes first. A section the user opened stays open on updates.
+      const wasOpen = new Set([...el.querySelectorAll("details.dash-sec[open]")].map((d) => d.id));
+      const seen = el.querySelector("details.dash-sec") !== null;
+      const sec = (id, letter, title, body) => `<details class="dash-sec" id="dash-${id}"${id === "summary" || (seen ? wasOpen.has("dash-" + id) : false) ? " open" : ""}><summary><h3><span class="dash-letter">${letter}</span>${esc(title)}</h3></summary>${body}</details>`;
       const block = (title, pillHtml, body) => `<div class="result"><div class="title"><span>${esc(title)}</span>${pillHtml || ""}</div>${body}</div>`;
       const when = (d) => d ? `<p class="hint">Retrieved ${esc(fmtDate(d))}.</p>` : "";
       const byId = (id) => a && a.datasets.find((d) => d.id === id);
@@ -137,7 +141,7 @@
       const pending = analysing
         ? `<p class="hint">Fetching flood polygons for the site and calculating intersections…</p>`
         : analysisError ? `<p class="msg bad">${esc("The site analysis could not be completed: " + analysisError)}</p>`
-        : hasSite ? `<p class="hint">Press <strong>Analyse site</strong> to measure how much of the site lies in each mapped area.</p>`
+        : hasSite ? `<p class="hint">Press <strong>Check</strong> under the map to measure how much of the site lies in each mapped area.</p>`
         : `<p class="hint">Draw or import a site boundary to measure how much of it lies in each mapped area.</p>`;
 
       // A. Site information
@@ -158,6 +162,7 @@
         ${p && p.eastings ? `<dt>Grid ref</dt><dd class="mono">E ${p.eastings}, N ${p.northings}</dd>` : ""}`;
       A += `</dl>`;
       if (!m) A += `<p class="hint">No site boundary yet: these results are for a single point.</p>`;
+      else if (site.auto) A += `<p class="hint">The site is the 600 m area around the pin. Draw or import your own boundary for an exact check.</p>`;
 
       // B. Flood-zone assessment
       let B = "";

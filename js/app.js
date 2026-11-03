@@ -54,7 +54,7 @@
   function recomputeSite() {
     const raw = FRC.boundaryDraw.getFeatures();
     const v = FRC.boundaryValidation.validate({ type: "FeatureCollection", features: raw }, "The site boundary");
-    const site = { features: v.features, warnings: [...state.importNotes, ...v.warnings], errors: v.features.length ? v.errors : [], measured: null };
+    const site = { auto: FRC.boundaryDraw.isAuto(), features: v.features, warnings: [...state.importNotes, ...v.warnings], errors: v.features.length ? v.errors : [], measured: null };
     if (v.features.length) {
       site.measured = FRC.measurements.measureSite(v.features);
       FRC.boundaryValidation.overlaps(v.features).forEach((o) => site.warnings.push(
@@ -85,7 +85,29 @@
     $("pdfBtn").disabled = !pdfReady();
   }
 
+  // ---------- Pin area ----------
+  // A dropped pin (map click or postcode) with no boundary of the user's own
+  // becomes a 600 m circle, the first site checked. Drawing or importing a
+  // boundary replaces it; editing it makes it the user's own boundary.
+  const PIN_RADIUS_M = 600;
+  function placePin(lat, lon, place) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    state.pinPlace = place || null;
+    FRC.boundaryDraw.removeAuto();
+    const circle = root.turf.circle([lon, lat], PIN_RADIUS_M / 1000, { steps: 72, units: "kilometers" });
+    circle.properties = { name: `${PIN_RADIUS_M} m area around the pin` };
+    FRC.map.showPoint(lat, lon, Number($("radius").value), { fit: false });
+    FRC.boundaryDraw.addFeatures([circle], { auto: true });
+    FRC.boundaryDraw.zoomTo();
+    clearTimeout(centroidTimer); // the check below covers the centroid
+    runSiteCheck();
+  }
+
   function onSiteChange(kind) {
+    // The user's own boundary replaces the pin area.
+    if ((kind === "drawn" || kind === "imported") && FRC.boundaryDraw.hasOwn() && FRC.boundaryDraw.layers().some((l) => l._frcAuto)) {
+      FRC.boundaryDraw.removeAuto();
+    }
     // Once every parcel is gone, messages about an earlier import no longer apply.
     if (kind === "cleared" || !FRC.boundaryDraw.layers().length) { state.importNotes = []; $("importMsg").textContent = ""; $("importMsg").className = "hint"; }
     recomputeSite();
@@ -130,7 +152,7 @@
     $("status").textContent = "Checking flood data…";
     FRC.map.showPoint(lat, lon, dist, { fit: !fromSite });
 
-    if (!place) place = await FRC.location.reverseLookup(lat, lon);
+    if (!place) place = await FRC.progress.track(FRC.location.reverseLookup(lat, lon), "Finding the place…");
     if (stale()) return null;
     const nation = FRC.location.nationOf(place);
     const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {} };
@@ -145,14 +167,14 @@
       tasks.push(FRC.ea.liveWarnings(lat, lon, dist).then((v) => { res.live = v; res.liveAt = new Date(); }).catch((e) => (res.errors.live = e.message)));
       tasks.push(FRC.ea.nearbyGauges(lat, lon, dist).then((v) => { res.gauges = v; res.liveAt = res.liveAt || new Date(); }).catch((e) => (res.errors.gauges = e.message)));
     }
-    await Promise.all(tasks);
+    await Promise.all(tasks.map((t) => FRC.progress.track(t, "Checking flood data at the point…")));
     // A later map click or postcode search takes precedence over this response.
     if (stale()) return res;
 
     FRC.map.showGauges(res.gauges);
     if (fromSite) state.siteCheck = res; else state.current = res;
     renderDashboard();
-    $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover the drawn site, not this point. Clear the site to report on this point." : "");
+    $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover your site boundary, not this point. Press Clear all to check this point instead." : "");
     $("pdfBtn").disabled = !pdfReady();
     return res;
   }
@@ -170,7 +192,8 @@
     try {
       // The nation comes from this check's own result, so a map click made
       // while it runs cannot change which country's data the site is checked against.
-      const res = await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
+      const pinPlace = state.site.auto ? state.pinPlace : null;
+      const res = await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], place: pinPlace || undefined, fromSite: true });
       const nation = res ? res.nation : FRC.location.nationOf(await FRC.location.reverseLookup(m.centroidWGS[1], m.centroidWGS[0]));
       const a = await FRC.floodAnalysis.analyseSite(features, nation);
       if (seq !== state.analysisSeq) return; // the boundary changed while we waited
@@ -192,12 +215,13 @@
     if (!FRC.location.isPostcode(pc)) { $("status").textContent = "That doesn't look like a UK postcode. Check it, for example YO1 7HH."; return; }
     $("status").textContent = "Looking up postcode…";
     try {
-      const place = await FRC.location.lookupPostcode(pc);
+      const place = await FRC.progress.track(FRC.location.lookupPostcode(pc), "Finding the postcode…");
       if (!place || !Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
         $("status").textContent = "The postcode service returned no usable location. Check the postcode and try again.";
         return;
       }
-      await runCheck({ lat: place.latitude, lon: place.longitude, place });
+      if (FRC.boundaryDraw.hasOwn()) await runCheck({ lat: place.latitude, lon: place.longitude, place });
+      else placePin(place.latitude, place.longitude, place);
     } catch (e) {
       $("status").textContent = /404/.test(e.message) ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.";
     }
@@ -223,6 +247,10 @@
       try { await c[1](); el.className = "pill info"; el.textContent = "Working"; }
       catch (e) { el.className = "pill bad"; el.textContent = "Blocked"; el.title = e.message; }
     }));
+    // The panel is folded away; open it when a service cannot be reached.
+    const blocked = ul.querySelectorAll(".pill.bad").length;
+    const panel = ul.closest("details");
+    if (panel) { panel.open = panel.open || blocked > 0; panel.querySelector("summary").textContent = blocked ? `Data connections: ${blocked} blocked` : "Data connections: all working"; }
   }
 
   // ---------- Start ----------
@@ -233,12 +261,28 @@
 
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); searchPostcode($("postcode").value); });
     document.querySelectorAll("[data-pc]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); $("postcode").value = a.dataset.pc; searchPostcode(a.dataset.pc); }));
-    map.on("click", (e) => { if (!FRC.boundaryDraw.isBusy() && !state.building) runCheck({ lat: e.latlng.lat, lon: e.latlng.lng }); });
+    map.on("click", (e) => {
+      if (FRC.boundaryDraw.isBusy() || state.building) return;
+      // With a boundary of the user's own, a click is a separate point check.
+      if (FRC.boundaryDraw.hasOwn()) runCheck({ lat: e.latlng.lat, lon: e.latlng.lng });
+      else placePin(e.latlng.lat, e.latlng.lng);
+    });
+    // "i" buttons: click shows or hides the help text they point to.
+    document.querySelectorAll("button.info, button.info-btn").forEach((b) => b.addEventListener("click", () => {
+      const t = $(b.getAttribute("aria-controls"));
+      const open = t.hidden; t.hidden = !open; b.setAttribute("aria-expanded", String(open));
+    }));
+    // Postcode search opens from the search button on the map.
+    const openSearch = (open) => {
+      $("searchPanel").hidden = !open; $("searchToggle").setAttribute("aria-expanded", String(open));
+      if (open) $("postcode").focus();
+    };
+    $("searchToggle").addEventListener("click", () => openSearch($("searchPanel").hidden));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("searchPanel").hidden) { openSearch(false); $("searchToggle").focus(); } });
     $("radius").addEventListener("change", () => {
       [state.current, state.siteCheck].forEach((c) => { if (c) runCheck({ lat: c.lat, lon: c.lon, place: c.place, fromSite: c.fromSite }); });
     });
 
-    $("drawBtn").addEventListener("click", () => FRC.boundaryDraw.startPolygon());
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());
     $("importInput").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ""; });
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
@@ -255,6 +299,7 @@
       const btn = $("pdfBtn");
       if (state.building) return;
       state.building = true; btn.disabled = true; btn.textContent = "Building PDF…";
+      FRC.progress.add(1, "Building the PDF report…");
       try {
         await FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
           company: $("company").value.trim(), logo: state.logo,
@@ -262,6 +307,7 @@
           sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         });
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
+      FRC.progress.tick();
       state.building = false; btn.disabled = !pdfReady(); btn.textContent = "Download PDF report";
     });
     $("checkBtn").addEventListener("click", testConnections);

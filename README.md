@@ -12,12 +12,14 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 
 | Step | What you can do |
 |---|---|
-| 1. Find the location | Search a UK postcode (checked for the right format) or click the map |
-| 2. Site boundary | Draw polygons or rectangles, edit corners, delete, clear and redraw. Several parcels are supported |
-| | Import GeoJSON, KML or a zipped Shapefile. Export the boundary as GeoJSON |
+| 1. Find the location | Search a UK postcode with the magnifier on the map (checked for the right format), or click the map to drop a pin. With no boundary of your own, the **600 m area around the pin** becomes the site and is checked straight away |
+| 2. Site boundary | Draw polygons or rectangles with the tools at the top left of the map (they replace the pin area), edit corners, delete, clear and redraw. Several parcels are supported |
+| | Import GeoJSON, KML or a zipped Shapefile with the folder button on the map. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |
-| 3. Results | **Analyse site** intersects the boundary with each flood dataset. The results dashboard opens with a **summary**: a risk rating for each source of flooding (rivers, sea, surface water, groundwater, sewers, reservoirs, historic floods) and whether a full Flood Risk Assessment is likely to be needed, with next steps and a note on climate change. Then five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
+| 3. Results | **Check** (under the map) intersects the boundary with each flood dataset. The results dashboard opens with a **summary**: a risk rating for each source of flooding (rivers, sea, surface water, groundwater, sewers, reservoirs, historic floods) and whether a full Flood Risk Assessment is likely to be needed, with next steps and a note on climate change. Then five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
 | 4. Report | PDF in the spec's structure, one section per page: 1 executive summary (document control box with version, prepared by and checked by; risk by source of flooding; "Is a full Flood Risk Assessment needed?" with next steps; climate change note; findings-at-a-glance table), 2 site location plan, 3 site boundary and measurements, 4 flood-zone assessment with a flood-zone map, 5 spatial intersection tables, 6 additional flood information, 7 warnings and gauges, 8 data status with retrieval times, sources, methodology, limitations and disclaimer. Company name and logo (remembered in this browser), reference and version on every page |
+
+A progress bar at the top of the page shows while data is fetched and measured. Each part of the page has an **i** button: hover for a tooltip, or click to show a short explanation. Under the map are the Check, Download PDF report, Export GeoJSON and Clear all buttons. Zoom is at the bottom left of the map.
 
 The **Data connections** panel tests each public service when the page opens.
 
@@ -109,6 +111,7 @@ js/
   geometry/                     projections (Proj4js), measurements
   flood-data/                   environment-agency, natural-resources-wales, sepa, data-normalisation
   dashboard/results.js          results and data status panels
+  progress.js                   Progress bar while data loads
   reporting/assessment.js       Risk by source, full FRA question, climate note
   reporting/pdf-report.js       PDF report
 tests/

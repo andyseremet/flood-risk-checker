@@ -151,6 +151,7 @@
       doc.setFont("helvetica", "bold"); doc.setFontSize(13); color(ACCENT); doc.text("Executive summary", M, y + 5); color(INK); y += 9;
       if (hasSite) para(`The site covers ${fmtNum(site.measured.area, 0)} m² (${fmtNum(site.measured.hectares, 2)} ha) in ${site.measured.parcels.length} parcel${site.measured.parcels.length > 1 ? "s" : ""}, with a perimeter of ${fmtNum(site.measured.perimeter, 0)} m.`);
       else para("No site boundary was defined. The results below are single-point checks at the location shown.");
+      if (hasSite && site.auto) note("The site checked is the 600 m area around the chosen point, not a site boundary. Draw or import the real boundary for exact areas.");
 
       // Risk by source of flooding, then the next step.
       const A = FRC.assessment;
@@ -260,7 +261,7 @@
       if (S.intersect) {
         section(5, "Flood-zone spatial intersection");
         if (!hasSite) notAssessed("No site boundary was defined, so no areas could be measured.");
-        else if (!analysis) notAssessed("The site-wide analysis was not run. Press Analyse site before building the report.");
+        else if (!analysis) notAssessed("The site-wide analysis was not run. Press Check under the map before building the report.");
         else {
           zoneSets.forEach((d) => {
             h3(d.name);
@@ -282,7 +283,7 @@
       // ---------- 6. Additional flood information ----------
       if (S.other) {
         section(6, "Additional flood information");
-        if (!analysis) notAssessed(hasSite ? "The site-wide analysis was not run. Press Analyse site before building the report." : "No site boundary was defined.");
+        if (!analysis) notAssessed(hasSite ? "The site-wide analysis was not run. Press Check under the map before building the report." : "No site boundary was defined.");
         else {
           otherSets.forEach((d) => {
             h3(d.name);

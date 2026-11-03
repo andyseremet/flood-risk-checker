@@ -5,6 +5,9 @@
 
   let map = null, marker = null, radiusCircle = null, gaugeLayer = null, analysisLayer = null;
   let snapQueue = Promise.resolve();
+  let snapping = false, lastCentre = null;
+  // Remembers the middle of the map after each move, so a resize can put it back.
+  const keepCentre = () => { if (!snapping && lastCentre) map.setView(lastCentre, map.getZoom(), { animate: false }); };
   const takeSnapshot = (opts) => FRC.map._snapshot(opts);
 
   // Resolves when every tile layer on the map has finished loading, or after
@@ -19,6 +22,51 @@
     return Promise.race([loaded, pause(timeout)]);
   }
 
+  const loadImage = (src) => new Promise((resolve) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => resolve(im); im.onerror = () => resolve(null);
+    im.src = src;
+  });
+
+  // Draws the map into a canvas from what the browser has actually laid out:
+  // each tile, overlay, outline and marker is drawn at its on-screen position
+  // inside the map. So the image matches the map exactly, and the view set
+  // for the snapshot (centred on the pin or the site) is the image's centre.
+  async function compose(el, width, height) {
+    const box = el.getBoundingClientRect();
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#f2efe9"; ctx.fillRect(0, 0, width, height);
+    const opacity = (n) => { let o = 1; for (let x = n; x && x !== el; x = x.parentElement) o *= Number(getComputedStyle(x).opacity); return o; };
+    const zIndex = (n) => { const p = n.closest(".leaflet-pane"); return p ? Number(getComputedStyle(p).zIndex) || 0 : 0; };
+    const nodes = [...el.querySelectorAll(".leaflet-map-pane img, .leaflet-map-pane svg, .leaflet-map-pane canvas")]
+      .filter((n) => !(n.tagName === "svg" && n.parentElement.closest("svg")))
+      .map((n, i) => ({ n, i, z: zIndex(n) }))
+      .sort((a, b) => a.z - b.z || a.i - b.i);
+    for (const { n } of nodes) {
+      const r = n.getBoundingClientRect();
+      if (!r.width || !r.height || r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) continue;
+      const o = opacity(n);
+      if (!o || getComputedStyle(n).visibility === "hidden" || getComputedStyle(n).display === "none") continue;
+      let src = null;
+      if (n.tagName === "IMG") src = await loadImage(n.currentSrc || n.src);
+      else if (n.tagName === "svg") {
+        const copy = n.cloneNode(true);
+        copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        copy.removeAttribute("style");
+        const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml" }));
+        src = await loadImage(url); URL.revokeObjectURL(url);
+      } else src = n;
+      if (!src) continue;
+      ctx.globalAlpha = o;
+      try { ctx.drawImage(src, r.left - box.left, r.top - box.top, r.width, r.height); } catch { /* a part that cannot be drawn is left out */ }
+    }
+    ctx.globalAlpha = 1;
+    return canvas;
+  }
+
   FRC.map = {
     init(elementId) {
       map = L.map(elementId, { zoomControl: true }).setView([54.3, -2.5], 6);
@@ -26,9 +74,16 @@
         maxZoom: 19, crossOrigin: true, attribution: "© OpenStreetMap contributors",
       }).addTo(map);
       gaugeLayer = L.layerGroup().addTo(map);
+      map.on("moveend", () => { if (!snapping) lastCentre = map.getCenter(); });
       L.control.scale({ imperial: false }).addTo(map);
+      // When the map's box changes size (a phone turned round, the page
+      // layout changing), keep the same place in the middle of the map.
+      if (root.ResizeObserver) new ResizeObserver(() => { map.invalidateSize({ pan: false, debounceMoveend: true }); keepCentre(); }).observe(map.getContainer());
       return map;
     },
+
+    // Put the checked point in the middle of the map.
+    centre() { if (marker) map.setView(marker.getLatLng(), map.getZoom()); },
     get() { return map; },
 
     // Show the checked location and the search radius.
@@ -58,7 +113,7 @@
       })));
     },
 
-    // Capture the map as an image for the PDF with a given view and overlays,
+    // Capture the map as an image for the PDF, centred on the given view, with a given view and overlays,
     // then put the view and layers back as they were.
     // view: { bounds } or { center: [lat, lon], zoom }. overlays: keys of
     // FRC.mapLayers.layers to show (others hidden). analysis: show shading.
@@ -72,6 +127,7 @@
 
     async _snapshot({ view, overlays = [], analysis = false, width = 900, height = 600 }) {
       const el = map.getContainer();
+      snapping = true;
       const layers = (FRC.mapLayers && FRC.mapLayers.layers) || {};
       const wasOn = Object.fromEntries(Object.entries(layers).map(([k, l]) => [k, map.hasLayer(l)]));
       const before = { center: map.getCenter(), zoom: map.getZoom() };
@@ -86,7 +142,7 @@
         if (view.bounds) map.fitBounds(view.bounds, { padding: [30, 30], maxZoom: 18, animate: false });
         else map.setView(view.center, view.zoom, { animate: false });
         await waitForTiles(map, 8000);
-        const canvas = await root.html2canvas(el, { useCORS: true, logging: false, scale: 1, ignoreElements: (n) => n.classList && n.classList.contains("leaflet-control-container") });
+        const canvas = await compose(el, width, height);
         return { img: canvas.toDataURL("image/jpeg", 0.85), w: canvas.width, h: canvas.height };
       } finally {
         Object.assign(el.style, style);
@@ -94,6 +150,7 @@
         Object.entries(layers).forEach(([k, l]) => { if (wasOn[k] && !map.hasLayer(l)) l.addTo(map); if (!wasOn[k] && map.hasLayer(l)) map.removeLayer(l); });
         if (analysisLayer) { if (hadAnalysis && !map.hasLayer(analysisLayer)) analysisLayer.addTo(map); if (!hadAnalysis && map.hasLayer(analysisLayer)) map.removeLayer(analysisLayer); }
         map.setView(before.center, before.zoom, { animate: false });
+        snapping = false;
       }
     },
 

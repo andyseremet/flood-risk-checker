@@ -89,6 +89,11 @@
     // Once every parcel is gone, messages about an earlier import no longer apply.
     if (kind === "cleared" || !FRC.boundaryDraw.layers().length) { state.importNotes = []; $("importMsg").textContent = ""; $("importMsg").className = "hint"; }
     recomputeSite();
+    // Keep the site in the middle of the map after it is drawn, edited or
+    // a parcel is removed. With no site left, centre the checked point.
+    if (kind === "drawn" || kind === "edited" || kind === "deleted") {
+      if (FRC.boundaryDraw.layers().length) FRC.boundaryDraw.zoomTo(); else FRC.map.centre();
+    }
   }
 
   async function importFile(file) {

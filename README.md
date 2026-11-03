@@ -122,7 +122,7 @@ The scripts are plain `<script>` files rather than ES modules, so the page also 
 
 ## Libraries
 
-Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), Proj4js 2.9.2, shpjs 4.0.4 (zipped Shapefiles, including the .prj), jsPDF 2.5.1 and html2canvas 1.4.1. KML is read with the browser's built-in DOMParser.
+Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), Proj4js 2.9.2, shpjs 4.0.4 (zipped Shapefiles, including the .prj) and jsPDF 2.5.1. Map images for the report are drawn by the app itself from the map's tiles, outlines and markers. KML is read with the browser's built-in DOMParser.
 
 ## Releasing a change
 

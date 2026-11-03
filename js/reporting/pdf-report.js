@@ -1,4 +1,4 @@
-// PDF screening report (jsPDF, with map images captured by html2canvas).
+// PDF screening report (jsPDF, with map images drawn from the map; see FRC.map.snapshot).
 // Follows the spec's report structure, one section per page:
 //   1 Executive summary            5 Flood-zone spatial intersection
 //   2 Site location plan           6 Additional flood information

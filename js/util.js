@@ -90,7 +90,8 @@
               throw e;
             } finally { clearTimeout(t); }
           });
-          if (cacheable) cache.set(url, data);
+          // An ArcGIS error comes back as HTTP 200 with an "error" body: never keep it.
+          if (cacheable && !(data && data.error)) cache.set(url, data);
           return data;
         } catch (e) {
           lastError = e;

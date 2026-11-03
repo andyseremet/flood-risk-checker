@@ -10,6 +10,7 @@ globalThis.fetch = async (url) => {
   const next = (plan[url] || []).shift();
   if (next === "net") throw new TypeError("Failed to fetch");
   if (typeof next === "number") return { ok: false, status: next, json: async () => ({}) };
+  if (next === "errbody") return { ok: true, status: 200, json: async () => ({ error: { message: "Failed to execute query." } }) };
   return { ok: true, status: 200, json: async () => ({ url }) };
 };
 require("../js/util.js");
@@ -42,6 +43,14 @@ const test = async (name, fn) => { calls = []; plan = {}; U.cache.clear(); await
     assert.strictEqual(calls.length, 2);
     await U.getJSON("https://x/flood-monitoring/id/floods"); await U.getJSON("https://x/flood-monitoring/id/floods");
     assert.strictEqual(calls.length, 4);
+  });
+  await test("An ArcGIS error answer (HTTP 200 with an error body) is never remembered", async () => {
+    plan["https://a/5"] = ["errbody"];
+    const first = await U.getJSON("https://a/5");
+    assert.ok(first.error);
+    const second = await U.getJSON("https://a/5");
+    assert.ok(!second.error);
+    assert.strictEqual(calls.length, 2);
   });
   await test("At most 4 requests run at the same time", async () => {
     maxRunning = 0;

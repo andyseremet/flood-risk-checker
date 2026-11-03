@@ -194,6 +194,12 @@
   function failures() {
     return failedPoint(state.current).length + failedPoint(state.siteCheck).length + failedAnalysis().length + failedConnections().length + failedTiles().length + (state.analysisError ? 1 : 0);
   }
+  // For a partial result, only the notes that say what is missing (not the
+  // notes about overlaps or how areas were measured).
+  const partialReason = (d) => {
+    const why = (d.notes || []).filter((n) => /did not return|only part|result limit|could not/i.test(n));
+    return why.length ? why.join(" ") : "Only part of the data came back.";
+  };
   // Every part failing now, for the error log.
   function failingParts() {
     const out = [];
@@ -202,7 +208,7 @@
       const jobs = pointJobs(res);
       failedPoint(res).forEach((k) => { const j = jobs.find((x) => x.key === k); out.push({ key: `${tag}:${k}`, what: `${where}: ${j ? j.label : k}`, message: res.errors[k], url: (res.errorUrls || {})[k] }); });
     });
-    failedAnalysis().forEach((d) => out.push({ key: "ds:" + d.id, what: "Site: " + d.name, message: d.error || (d.status === "partial" ? "Only part of the data came back. " + (d.notes || []).join(" ") : d.statusText), url: d.errorUrl }));
+    failedAnalysis().forEach((d) => out.push({ key: "ds:" + d.id, what: "Site: " + d.name, message: d.error || (d.status === "partial" ? partialReason(d) : d.statusText), url: d.errorUrl }));
     if (state.analysisError) out.push({ key: "analysis", what: "Site analysis", message: state.analysisError });
     failedConnections().forEach((i) => out.push({ key: "conn:" + i, what: "Connection: " + CHECKS[i][0], message: $("chk" + i).title, url: $("chk" + i).dataset.url || null }));
     failedTiles().forEach((k) => out.push({ key: "tile:" + k, what: "Map layer: " + FRC.mapLayers.tileErrors[k], message: "Some map tiles did not load." }));
@@ -434,8 +440,9 @@
     // results remembered from the last hour.
     $("siteCheckBtn").addEventListener("click", () => FRC.util.fresh(runSiteCheck));
     $("cacheClear").addEventListener("click", () => { FRC.util.cache.clear(); $("cacheMsg").textContent = "Saved results cleared."; });
-    $("retryBtn").addEventListener("click", retryFailed);
-    $("errLogRetry").addEventListener("click", retryFailed);
+    // Try again always asks the services again, never saved results.
+    $("retryBtn").addEventListener("click", () => FRC.util.fresh(retryFailed));
+    $("errLogRetry").addEventListener("click", () => FRC.util.fresh(retryFailed));
     $("netWarnClose").addEventListener("click", () => { $("netWarnBox").hidden = true; });
     FRC.errorLog.init();
     FRC.mapLayers.onTileError = updateRetry;

@@ -139,7 +139,15 @@
       let siteArea;
       try { siteArea = areaOf(unionAll(parcels)); } catch { siteArea = parcels.reduce((a, f) => a + areaOf(f), 0); }
       const bb = parcels.map((f) => T().bbox(f)).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
-      const cell = Math.max(0.25, Math.sqrt(((bb[2] - bb[0]) * (bb[3] - bb[1])) / target));
+      // Spacing comes from the site's own area, so a thin or diagonal site
+      // still gets about `target` points inside it (capped at 2 million grid
+      // cells over its bounding box).
+      const bbArea = (bb[2] - bb[0]) * (bb[3] - bb[1]);
+      const cell = Math.max(0.25, Math.sqrt(siteArea / target), Math.sqrt(bbArea / 2e6));
+      // Each point is moved by a fixed pseudo-random amount within its cell
+      // (a jittered grid), so the grid cannot line up with a straight edge.
+      let seed = 0x2f6b1d;
+      const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
       const box = [bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1];
       const inside = (x, y, f) => {
         const g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
@@ -154,8 +162,9 @@
       const meta = new Map();
       items.forEach((it) => { if (!meta.has(it.key)) meta.set(it.key, { key: it.key, label: it.label, rank: it.rank, n: 0, raw: 0 }); });
       let total = 0, coveredN = 0;
-      for (let y = bb[1] + cell / 2; y < bb[3]; y += cell) {
-        for (let x = bb[0] + cell / 2; x < bb[2]; x += cell) {
+      for (let y0 = bb[1]; y0 < bb[3]; y0 += cell) {
+        for (let x0 = bb[0]; x0 < bb[2]; x0 += cell) {
+          const x = x0 + rand() * cell, y = y0 + rand() * cell;
           if (!parcels.some((f) => inside(x, y, f))) continue;
           total++;
           const hits = new Set();

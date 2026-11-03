@@ -212,7 +212,7 @@
           if (res.band || res.errors.band) {
             h3("Long-term risk, rivers and sea (England)");
             if (res.errors.band) { kv("Status", "Service unavailable"); note(res.errors.band); }
-            else if (!res.band.band) { kv("Result", "No band mapped"); note("No risk band was returned at this point. This is not a confirmed very low result."); }
+            else if (!res.band.band) { kv("Result", "No band mapped"); note("No risk band was returned at this point. This is not a confirmed very low result: the service's point answers are not reliable, so check the Environment Agency's long-term flood risk map."); }
             else { kv("Result", res.band.band); kv("Status", `Data retrieved  (retrieved ${fmtDate(res.band.retrieved)})`); note("Environment Agency Risk of Flooding from Rivers and Sea, which takes flood defences into account."); }
           }
         } else notAssessed("No point check was run.");
@@ -290,7 +290,7 @@
             kv("Status", `Data retrieved  (retrieved ${fmtDate(res.liveAt)})`);
             if (!res.gauges.length) kv("Finding", "No river level gauges in this radius.");
             else table([{ title: "Gauge", width: 66 }, { title: "Distance", width: 24, align: "right" }, { title: "Latest level", width: 28, align: "right" }, { title: "Reading time", width: CW - 118 }],
-              res.gauges.map((g) => [g.name + (g.river ? ", " + g.river : ""), g.km.toFixed(1) + " km", g.value != null ? g.value.toFixed(2) + " m" : "-", g.value != null ? fmtDate(g.time) : "No recent reading"]));
+              res.gauges.map((g) => [g.name + (g.river ? ", " + g.river : ""), g.km.toFixed(1) + " km", g.value != null ? g.value.toFixed(2) + " " + (g.unit || "m") : "-", g.value != null ? fmtDate(g.time) : "No recent reading"]));
           }
           note("Live data changes quickly. Check the Environment Agency's flood warning service for the current position.");
         }
@@ -336,7 +336,9 @@
       }
       color(INK);
       const base = (opts.siteName || p.postcode || "site").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "site";
-      doc.save(`flood-report-${base}-${when.toISOString().slice(0, 10)}.pdf`);
+      const pad = (n) => String(n).padStart(2, "0");
+      const day = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`; // local date, as printed in the report
+      doc.save(`flood-report-${base}-${day}.pdf`);
     },
   };
 })(typeof window !== "undefined" ? window : globalThis);

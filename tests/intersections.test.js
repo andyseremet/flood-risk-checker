@@ -165,4 +165,18 @@ test("A huge valley-wide polygon (300,000 vertices) is cut to the site first and
   assert.strictEqual(FRC.intersections.touching(site, [{ geometry: big }]).length, 1);
 });
 
+test("The area estimate handles a thin strip at 45 degrees (jittered grid)", () => {
+  // 2,000 m x 6 m strip at 45 degrees; flood cover on one third of its width.
+  const c = Math.SQRT1_2, ox = E0, oy = N0;
+  const at = (u, v) => [ox + u * c - v * c, oy + u * c + v * c];
+  const poly = (v0, v1) => P.geometryToWGS84({ type: "Polygon", coordinates: [[at(0, v0), at(2000, v0), at(2000, v1), at(0, v1), at(0, v0)]] });
+  const strip = [poly(0, 6)];
+  const items = FRC.normalise.ea([ea("FZ3", poly(-50, 2))]);
+  const exact = FRC.intersections.exactGroup(strip, items);
+  const est = FRC.intersections.estimateGroup(strip, items, null);
+  near(row(exact, "FZ3").percent, 33.33, 0.2, "exact %");
+  near(row(est, "FZ3").percent, 33.33, 2, "estimated %");
+  assert.ok(est.estimate.points > 5000, `points inside the site: ${est.estimate.points}`);
+});
+
 console.log(`\n${passed} tests passed`);

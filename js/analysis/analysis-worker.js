@@ -16,6 +16,7 @@ importScripts(
 );
 
 const I = self.FRC.intersections;
+self.postMessage({ ready: true }); // scripts loaded: the page starts its time limit now
 self.onmessage = (ev) => {
   const { op, args } = ev.data;
   try {

@@ -147,7 +147,7 @@
         <dt>Site name</dt><dd>${esc(siteName || "Not given")}</dd>
         <dt>Location</dt><dd>${esc((p && [p.admin_ward, p.admin_district].filter(Boolean).join(", ")) || "-")}</dd>
         <dt>Postcode</dt><dd>${esc((p && p.postcode) || "Not found")}</dd>
-        <dt>Country</dt><dd>${esc((res && res.nation) || (a && a.nation) || "Not checked yet")}</dd>`;
+        <dt>Country</dt><dd>${esc((res && res.nation) || (a && a.nation) || "Not checked yet")}${res && res.place && res.place.nearBorder ? " (near a national border, so every agency's data is checked)" : ""}</dd>`;
       if (m) A += `
         <dt>Site area</dt><dd class="mono">${fmtNum(m.area, 0)} m² · ${fmtNum(m.hectares, 2)} ha · ${fmtNum(m.acres, 2)} acres</dd>
         <dt>Perimeter</dt><dd class="mono">${fmtNum(m.perimeter, 1)} m</dd>
@@ -175,7 +175,7 @@
             ? block("Long-term risk, rivers and sea (England)", pill("bad", "Service unavailable"), `<p>${esc(res.errors.band)}</p>`)
             : res.band.band
               ? block("Long-term risk, rivers and sea (England)", pill("info", res.band.band), `<p>Environment Agency risk band at ${res.fromSite ? "the site centroid" : "this point"}, taking flood defences into account.</p>` + when(res.band.retrieved))
-              : block("Long-term risk, rivers and sea (England)", pill("info", "No band mapped"), `<p>No risk band was returned at this point. This is not a confirmed "very low" result.</p>` + when(res.band.retrieved));
+              : block("Long-term risk, rivers and sea (England)", pill("info", "No band mapped"), `<p>No risk band was returned at this point. This is not a confirmed "very low" result: the service's point answers are not reliable, so check the risk band map layer.</p>` + when(res.band.retrieved));
         }
       }
 
@@ -200,7 +200,7 @@
         if (res.errors.gauges) D += block("River gauges", pill("bad", "Service unavailable"), `<p>${esc(res.errors.gauges)}</p>`);
         else if (res.gauges) D += block(`River gauges within ${res.dist} km`, pill("info", res.gauges.length ? res.gauges.length + " found" : "None found"),
           (res.gauges.length ? `<div class="tablewrap"><table class="data"><thead><tr><th>Gauge</th><th class="num">Distance</th><th class="num">Latest level</th><th>Reading time</th></tr></thead><tbody>` +
-            res.gauges.map((g) => `<tr><td>${esc(g.name)}${g.river ? `<br><span class="hint">${esc(g.river)}</span>` : ""}</td><td class="num">${g.km.toFixed(1)} km</td><td class="num">${g.value != null ? g.value.toFixed(2) + " m" : "-"}</td><td>${g.value != null ? esc(fmtDate(g.time)) : "No recent reading"}</td></tr>`).join("") +
+            res.gauges.map((g) => `<tr><td>${esc(g.name)}${g.river ? `<br><span class="hint">${esc(g.river)}</span>` : ""}</td><td class="num">${g.km.toFixed(1)} km</td><td class="num">${g.value != null ? g.value.toFixed(2) + " " + esc(g.unit || "m") : "-"}</td><td>${g.value != null ? esc(fmtDate(g.time)) : "No recent reading"}</td></tr>`).join("") +
             `</tbody></table></div>` : `<p>No river level gauges in this radius.</p>`) + when(res.liveAt));
         D += `<p class="hint">Live data is for ${res.fromSite ? "the site centroid" : "this point"}. Change the radius in the Report card.</p>`;
       }

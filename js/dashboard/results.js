@@ -55,7 +55,49 @@
 
   const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
 
+  const ANALYSIS_PILL = { completed: "info", none: "info", partial: "warn", notAssessed: "neutral", unavailable: "bad", error: "bad" };
+
+  // One-sentence finding per group, worded so a missing polygon is never "safe".
+  function groupFinding(g, noneText) {
+    const pct = (v) => v.toFixed(1) + "%";
+    if (g.extent === "none") return `No mapped polygon intersects the site (${noneText.toLowerCase()} across 100% of the site).`;
+    const parts = g.rows.map((r) => `${r.label} ${pct(r.percent)}`).join(", ");
+    return g.extent === "whole" ? `The whole site lies within mapped polygons: ${parts}.` : `Part of the site (${pct(g.coveredPercent)}) lies within mapped polygons: ${parts}.`;
+  }
+
+  function analysisTable(g, noneText) {
+    const tr = (label, area, pctv, cls = "") => `<tr class="${cls}"><td>${esc(label)}</td><td class="num">${fmtNum(area, 0)}</td><td class="num">${pctv.toFixed(1)}%</td></tr>`;
+    return `<div class="tablewrap"><table class="data"><thead><tr><th>Classification</th><th class="num">Area m²</th><th class="num">% of site</th></tr></thead><tbody>` +
+      g.rows.map((r) => tr(r.label, r.area, r.percent)).join("") +
+      tr(noneText, g.remainingArea, g.remainingPercent, "muted") +
+      tr("Total site", g.siteArea, 100, "total") + `</tbody></table></div>`;
+  }
+
   FRC.results = {
+    groupFinding,
+    analysisTable,
+
+    renderAnalysis(el, a) {
+      if (!a) { el.innerHTML = ""; return; }
+      const assessed = a.datasets.filter((d) => d.status !== "notAssessed");
+      const skipped = a.datasets.filter((d) => d.status === "notAssessed");
+      let html = a.notes.map((n) => `<p class="msg warn">${esc(n)}</p>`).join("");
+      assessed.forEach((d) => {
+        html += `<div class="result"><div class="title"><span>${esc(d.name)}</span>${pill(ANALYSIS_PILL[d.status], d.statusText)}</div>`;
+        if (d.error) html += `<p>${esc(d.error)}</p>`;
+        (d.groups || []).forEach((g) => {
+          if (d.groups.length > 1 || g.group !== d.nation) html += `<p><strong>${esc(g.group)}</strong></p>`;
+          html += `<p>${esc(groupFinding(g, d.noneText))}</p>` + analysisTable(g, d.noneText);
+        });
+        html += d.notes.map((n) => `<p class="hint">${esc(n)}</p>`).join("");
+        if (d.retrieved) html += `<p class="hint">Data retrieved ${esc(fmtDate(d.retrieved))}.</p>`;
+        html += `</div>`;
+      });
+      if (skipped.length) html += `<p class="hint">Not assessed: ${skipped.map((d) => esc(d.name.split(" (")[0])).join("; ")} (site is not in that nation).</p>`;
+      html += `<p class="hint">Areas are calculated in British National Grid by intersecting the site boundary with each dataset's polygons. Flood polygons are not assumed to be a complete partition: overlaps are counted once, in the more severe class.</p>`;
+      el.innerHTML = html;
+    },
+
     zoneSummary,
     bandClass,
     dataStatus,
@@ -99,7 +141,7 @@
           <dt>Area</dt><dd>${esc([p && p.admin_ward, p && p.admin_district].filter(Boolean).join(", ") || "-")}</dd>
           <dt>Coordinates</dt><dd class="mono">${res.lat.toFixed(5)}, ${res.lon.toFixed(5)}</dd>
           ${p && p.eastings ? `<dt>Grid ref</dt><dd class="mono">E ${p.eastings}, N ${p.northings}</dd>` : ""}
-        </dl>${res.fromSite ? `<p class="hint">Flood data below is checked at the site's centroid. Checking the whole site area against flood zones comes in the next phase.</p>` : ""}</div>`;
+        </dl>${res.fromSite ? `<p class="hint">These point checks use the site centroid. The site-wide flood-zone analysis covers the whole boundary.</p>` : ""}</div>`;
       html += `<div class="result"><div class="title"><span>Flood zone</span>${pill(z.pill[0], z.pill[1])}</div><p>${esc(z.text)}</p></div>`;
       if (res.band || res.errors.band) {
         html += res.band

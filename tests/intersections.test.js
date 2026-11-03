@@ -1,0 +1,101 @@
+// Intersection tests: a site and flood polygons with known geometry, built in
+// British National Grid so the expected areas are exact.
+// Run from this folder: npm install && npm test
+const assert = require("assert");
+const path = require("path");
+
+globalThis.proj4 = require("proj4");
+globalThis.turf = require(path.join(__dirname, "node_modules/@turf/turf/turf.min.js"));
+require("../js/config.js");
+require("../js/util.js");
+require("../js/geometry/projections.js");
+require("../js/geometry/measurements.js");
+require("../js/flood-data/data-normalisation.js");
+require("../js/analysis/intersections.js");
+const FRC = globalThis.FRC;
+const P = FRC.projections;
+
+// Rectangle in BNG metres -> WGS84 Polygon geometry
+const rect = (e, n, w, h) => P.geometryToWGS84({ type: "Polygon", coordinates: [[[e, n], [e + w, n], [e + w, n + h], [e, n + h], [e, n]]] });
+const E0 = 430000, N0 = 430000;
+const site = [rect(E0, N0, 100, 100)]; // 10,000 m²
+const ea = (zone, geometry) => ({ geometry, properties: { flood_zone: zone, flood_source: "river" } });
+const row = (res, key) => res.rows.find((r) => r.key === key);
+const near = (a, e, tol, label) => assert.ok(Math.abs(a - e) <= tol, `${label}: expected ${e} ± ${tol}, got ${a}`);
+
+let passed = 0;
+const test = (name, fn) => { fn(); passed++; console.log("  ok  " + name); };
+console.log("Intersection tests");
+
+test("Spec example: 60% no polygon, 20% Zone 2, 20% Zone 3 (Zone 2 polygon also covers the Zone 3 area)", () => {
+  const items = FRC.normalise.ea([
+    ea("FZ3", rect(E0 - 50, N0 - 50, 70, 200)),  // covers x 0-20 of the site and extends outside it
+    ea("FZ2", rect(E0 - 50, N0 - 50, 90, 200)),  // covers x 0-40, overlapping the Zone 3 strip
+  ]);
+  const r = FRC.intersections.analyseGroup(site, items);
+  near(r.siteArea, 10000, 0.5, "site area");
+  near(row(r, "FZ3").area, 2000, 0.5, "Zone 3 area");
+  near(row(r, "FZ3").percent, 20, 0.01, "Zone 3 %");
+  near(row(r, "FZ2").area, 2000, 0.5, "Zone 2 area (outside Zone 3)");
+  near(row(r, "FZ2").rawArea, 4000, 0.5, "Zone 2 polygon area inside site");
+  near(r.remainingArea, 6000, 0.5, "no polygon area");
+  near(r.remainingPercent, 60, 0.01, "no polygon %");
+  assert.strictEqual(r.extent, "part");
+  assert.strictEqual(r.overlaps.length, 1);
+  near(r.overlaps[0].area, 2000, 0.5, "Zone 2 / Zone 3 overlap");
+});
+
+test("Site entirely outside the flood polygons: nothing intersects, not called Zone 1", () => {
+  const items = FRC.normalise.ea([ea("FZ3", rect(E0 + 500, N0, 100, 100))]);
+  const r = FRC.intersections.analyseGroup(site, items);
+  assert.strictEqual(r.rows.length, 0);
+  assert.strictEqual(r.extent, "none");
+  near(r.remainingArea, 10000, 0.5, "no polygon area");
+});
+
+test("Whole site in Zone 3", () => {
+  const r = FRC.intersections.analyseGroup(site, FRC.normalise.ea([ea("FZ3", rect(E0 - 10, N0 - 10, 200, 200))]));
+  near(row(r, "FZ3").percent, 100, 0.01, "Zone 3 %");
+  assert.strictEqual(r.extent, "whole");
+});
+
+test("Overlapping polygons of the same zone are counted once", () => {
+  const items = FRC.normalise.ea([ea("FZ2", rect(E0, N0, 60, 100)), ea("FZ2", rect(E0 + 30, N0, 50, 100))]);
+  const r = FRC.intersections.analyseGroup(site, items);
+  near(row(r, "FZ2").area, 8000, 0.5, "Zone 2 union area (x 0-80)");
+});
+
+test("Multi-parcel site with overlapping parcels uses the combined footprint", () => {
+  const parcels = [rect(E0, N0, 100, 100), rect(E0 + 50, N0, 100, 100)]; // union = 150 x 100
+  const r = FRC.intersections.analyseGroup(parcels, FRC.normalise.ea([ea("FZ3", rect(E0 + 100, N0, 100, 100))]));
+  near(r.siteArea, 15000, 0.5, "site footprint");
+  near(row(r, "FZ3").area, 5000, 0.5, "Zone 3 area");
+});
+
+test("Site with a hole: flood polygon inside the hole does not count", () => {
+  const outer = [[E0, N0], [E0 + 100, N0], [E0 + 100, N0 + 100], [E0, N0 + 100], [E0, N0]];
+  const hole = [[E0 + 40, N0 + 40], [E0 + 40, N0 + 60], [E0 + 60, N0 + 60], [E0 + 60, N0 + 40], [E0 + 40, N0 + 40]];
+  const holed = [P.geometryToWGS84({ type: "Polygon", coordinates: [outer, hole] })];
+  const r = FRC.intersections.analyseGroup(holed, FRC.normalise.ea([ea("FZ3", rect(E0 + 40, N0 + 40, 20, 20))]));
+  near(r.siteArea, 9600, 0.5, "site area");
+  assert.strictEqual(r.rows.length, 0);
+});
+
+test("SEPA likelihood bands are made exclusive, most likely first", () => {
+  const f = (layer, g) => ({ geometry: g, properties: { sepaLayer: layer } });
+  const items = FRC.normalise.sepa([f(0, rect(E0, N0, 10, 100)), f(1, rect(E0, N0, 30, 100)), f(2, rect(E0, N0, 50, 100))]);
+  assert.ok(items.every((i) => i.group === "Scotland: River"));
+  const r = FRC.intersections.analyseGroup(site, items);
+  near(row(r, "River-High").area, 1000, 0.5, "High");
+  near(row(r, "River-Medium").area, 2000, 0.5, "Medium only");
+  near(row(r, "River-Low").area, 2000, 0.5, "Low only");
+  near(r.remainingArea, 5000, 0.5, "no extent");
+});
+
+test("Unknown EA zone value is kept as its own class, not dropped", () => {
+  const r = FRC.intersections.analyseGroup(site, FRC.normalise.ea([ea("", rect(E0, N0, 50, 100))]));
+  assert.strictEqual(r.rows[0].key, "EA-other");
+  near(r.rows[0].area, 5000, 0.5, "unclassified area");
+});
+
+console.log(`\n${passed} tests passed`);

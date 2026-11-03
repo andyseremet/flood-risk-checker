@@ -3,7 +3,7 @@
   "use strict";
   const FRC = (root.FRC = root.FRC || {});
 
-  let map = null, marker = null, radiusCircle = null, gaugeLayer = null;
+  let map = null, marker = null, radiusCircle = null, gaugeLayer = null, analysisLayer = null;
 
   FRC.map = {
     init(elementId) {
@@ -26,6 +26,20 @@
       const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#0b6e8a";
       radiusCircle = L.circle([lat, lon], { radius: distKm * 1000, color: accent, weight: 1, fillOpacity: 0.04, interactive: false }).addTo(map);
       if (fit) map.setView([lat, lon], distKm >= 5 ? 12 : 14);
+    },
+
+    // Draw the flood-zone parts of the site, darkest for the most severe class.
+    showAnalysis(analysis) {
+      if (!analysisLayer) analysisLayer = L.layerGroup().addTo(map);
+      analysisLayer.clearLayers();
+      if (!analysis) return;
+      const fill = { 1: "#1f4e99", 2: "#5b8fd6", 3: "#a9c6ee" };
+      analysis.datasets.forEach((d) => (d.groups || []).forEach((g) => g.rows.forEach((r) => {
+        if (!r.geometry) return;
+        L.geoJSON(r.geometry, { interactive: true, style: { color: fill[r.rank] || "#5b8fd6", weight: 1, fillColor: fill[r.rank] || "#5b8fd6", fillOpacity: 0.55 } })
+          .bindTooltip(`${g.group}: ${r.label}, ${FRC.util.fmtNum(r.area, 0)} m² (${r.percent.toFixed(1)}%)`, { sticky: true })
+          .addTo(analysisLayer);
+      })));
     },
 
     showGauges(gauges) {

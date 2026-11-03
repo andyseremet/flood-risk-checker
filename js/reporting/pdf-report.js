@@ -6,8 +6,9 @@
 
   FRC.pdfReport = {
     // res: last flood check (may be null); site: { features, measured } (may be empty);
+    // analysis: site-wide flood-zone analysis (may be null);
     // opts: { siteName, ref, analyst, notes, sections: {location,map,site,zone,band,live,gauges} }
-    async build(res, site, opts) {
+    async build(res, site, analysis, opts) {
       const { jsPDF } = root.jspdf;
       const doc = new jsPDF({ unit: "mm", format: "a4" });
       const W = 210, M = 16, CW = W - 2 * M;
@@ -16,7 +17,15 @@
       const h1 = (t) => { doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(t, M, y + 6); y += 11; };
       const h2 = (t) => { ensure(14); y += 3; doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(11, 110, 138); doc.text(t, M, y + 4); doc.setTextColor(20, 35, 43); y += 8; };
       const para = (t, size = 10) => { doc.setFont("helvetica", "normal"); doc.setFontSize(size); const lines = doc.splitTextToSize(String(t), CW); ensure(lines.length * size * 0.45 + 2); doc.text(lines, M, y + 4); y += lines.length * size * 0.45 + 2; };
-      const kv = (k, v) => { ensure(6); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text(String(k), M, y + 4); doc.setFont("helvetica", "normal"); const lines = doc.splitTextToSize(String(v), CW - 46); doc.text(lines, M + 46, y + 4); y += Math.max(1, lines.length) * 4.6 + 1; };
+      const kv = (k, v) => {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold"); const keys = doc.splitTextToSize(String(k), 44);
+        doc.setFont("helvetica", "normal"); const lines = doc.splitTextToSize(String(v), CW - 48);
+        const n = Math.max(1, keys.length, lines.length); ensure(n * 4.6 + 1);
+        doc.setFont("helvetica", "bold"); doc.text(keys, M, y + 4);
+        doc.setFont("helvetica", "normal"); doc.text(lines, M + 48, y + 4);
+        y += n * 4.6 + 1;
+      };
       const S = opts.sections;
       const hasSite = site && site.features.length && site.measured;
       const p = (res && res.place) || {};
@@ -26,6 +35,20 @@
       h1("Flood risk screening report");
       para([opts.siteName || p.postcode || "Unnamed site", res ? res.nation : null, "Generated " + fmtDate(when)].filter(Boolean).join("  ·  "), 10);
       if (opts.ref || opts.analyst) para([opts.ref && "Reference: " + opts.ref, opts.analyst && "Analyst: " + opts.analyst].filter(Boolean).join("   "), 10);
+      // Executive summary: the headline findings, with missing data stated plainly.
+      if (hasSite || res) {
+        h2("Executive summary");
+        if (hasSite) para(`Site area ${fmtNum(site.measured.area, 0)} m² (${fmtNum(site.measured.hectares, 2)} ha) in ${site.measured.parcels.length} parcel${site.measured.parcels.length > 1 ? "s" : ""}.`);
+        if (analysis) {
+          analysis.datasets.filter((d) => d.status !== "notAssessed").forEach((d) => {
+            if (!d.groups || !d.groups.length) { para(`${d.name}: ${d.statusText}.`); return; }
+            d.groups.forEach((g) => para(`${g.group}: ${FRC.results.groupFinding(g, d.noneText)} Status: ${d.statusText}.`));
+          });
+          analysis.notes.forEach((n) => para(n));
+        } else if (hasSite) para("The site-wide flood-zone analysis was not run for this report.");
+        if (res && res.live) para(res.live.length ? `${res.live.length} flood warning or alert in force within ${res.dist} km at ${fmtDate(res.liveAt)}.` : `No flood warnings or alerts in force within ${res.dist} km at ${fmtDate(res.liveAt)}.`);
+        para("This is a preliminary screening summary, not a site-specific Flood Risk Assessment.", 9);
+      }
       if (opts.notes) { h2("Notes"); para(opts.notes); }
 
       if (S.location && res) {
@@ -48,6 +71,27 @@
         if (m.parcels.length > 1) m.parcels.forEach((pc) => kv("  " + pc.name, `${fmtNum(pc.area, 0)} m²  ·  perimeter ${fmtNum(pc.perimeter, 1)} m`));
         site.warnings.forEach((w) => para("Note: " + w, 9));
         para("Measured on the British National Grid (EPSG:27700) from the boundary's corner points. Grid areas can differ from ground areas by up to about 0.1% depending on location.", 8.5);
+      }
+
+      if (S.intersect && hasSite) {
+        h2("Flood-zone spatial intersection");
+        if (!analysis) para("Not assessed: the site-wide analysis was not run.");
+        else {
+          analysis.datasets.forEach((d) => {
+            ensure(16);
+            doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text(doc.splitTextToSize(d.name, CW), M, y + 4); y += 6;
+            kv("Status", d.statusText + (d.retrieved ? `  (retrieved ${fmtDate(d.retrieved)})` : ""));
+            if (d.error) para("Reason: " + d.error, 9);
+            (d.groups || []).forEach((g) => {
+              if (d.groups.length > 1 || g.group !== d.nation) kv("Group", g.group);
+              g.rows.forEach((r) => kv(r.label, `${fmtNum(r.area, 0)} m²  ·  ${r.percent.toFixed(1)}% of site`));
+              kv(d.noneText, `${fmtNum(g.remainingArea, 0)} m²  ·  ${g.remainingPercent.toFixed(1)}% of site`);
+              kv("Total site", `${fmtNum(g.siteArea, 0)} m²  ·  100%`);
+            });
+            d.notes.forEach((n) => para(n, 9));
+          });
+          para("Method: the site boundary and each dataset's polygons were converted to British National Grid (EPSG:27700) and intersected. Polygons of the same class were merged so overlaps count once; where classes overlap, the area is counted once in the more severe class. Land with no mapped polygon is reported as such and is not classified as Flood Zone 1.", 8.5);
+        }
       }
 
       if (S.map) {

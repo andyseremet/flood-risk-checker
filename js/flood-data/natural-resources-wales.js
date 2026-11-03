@@ -4,6 +4,14 @@
   const FRC = (root.FRC = root.FRC || {});
 
   FRC.nrw = {
+    async zonesInBox(bbox, { max = 1000 } = {}) {
+      const A = FRC.config.api;
+      const url = `${A.nrw}?service=WFS&version=1.0.0&request=GetFeature&typename=${encodeURIComponent(A.nrwLayer)}&outputFormat=json&srsName=EPSG:4326&bbox=${bbox.join(",")},EPSG:4326&maxFeatures=${max}`;
+      const r = await FRC.util.getJSON(url, 30000);
+      const features = Array.isArray(r.features) ? r.features : [];
+      return { features, partial: features.length >= max, retrieved: new Date() };
+    },
+
     async zoneAtPoint(lat, lon) {
       const A = FRC.config.api, d = 0.0005;
       const url = `${A.nrw}?service=WFS&version=1.0.0&request=GetFeature&typename=${encodeURIComponent(A.nrwLayer)}&outputFormat=json&srsName=EPSG:4326&bbox=${lon - d},${lat - d},${lon + d},${lat + d},EPSG:4326&maxFeatures=50`;

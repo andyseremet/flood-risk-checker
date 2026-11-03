@@ -6,6 +6,24 @@
   const box = (lat, lon, d = 0.0005) => [lon - d, lat - d, lon + d, lat + d];
 
   FRC.ea = {
+    // All Flood Zone 2 and 3 polygons whose bounding box touches bbox
+    // [minLon, minLat, maxLon, maxLat]. Follows the service's "next" links.
+    async zonesInBox(bbox, { pageSize = 500, maxPages = 10 } = {}) {
+      let url = `${FRC.config.api.eaZones}?f=json&limit=${pageSize}&bbox=${bbox.join(",")}`;
+      const features = [];
+      let pages = 0, matched = null;
+      while (url && pages < maxPages) {
+        const d = await FRC.util.getJSON(url, 30000);
+        pages++;
+        if (Number.isFinite(d.numberMatched)) matched = d.numberMatched;
+        features.push(...(Array.isArray(d.features) ? d.features : []));
+        const next = (d.links || []).find((l) => l.rel === "next");
+        url = next && (d.features || []).length ? next.href : null;
+      }
+      const partial = Boolean(url) || (matched != null && features.length < matched);
+      return { features, partial, matched, retrieved: new Date() };
+    },
+
     // Point check against Flood Zones 2 and 3. The service publishes only
     // Zones 2 and 3, so an empty result is NOT proof of Zone 1.
     async zoneAtPoint(lat, lon) {

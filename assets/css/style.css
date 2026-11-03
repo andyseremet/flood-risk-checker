@@ -83,3 +83,7 @@ table.data th, table.data td { text-align: left; padding: 4px 6px; border-bottom
 table.data th { color: var(--muted); font-weight: 600; font-size: 12px; }
 table.data .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .site-swatch { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--site); border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+table.data tr.muted td { color: var(--muted); }
+table.data tr.total td { font-weight: 700; border-bottom: 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+[hidden] { display: none !important; }

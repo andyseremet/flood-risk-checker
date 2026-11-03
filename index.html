@@ -38,14 +38,19 @@
       <p class="hint" id="importMsg" role="status"></p>
       <div id="siteInfo"></div>
       <div class="row">
-        <button type="button" id="siteCheckBtn" disabled>Check flood data for site</button>
+        <button type="button" id="siteCheckBtn" disabled>Analyse site</button>
         <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
         <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
       </div>
     </section>
 
+    <section class="card" aria-labelledby="h-analysis" id="analysisCard" hidden>
+      <h2 id="h-analysis">3. Site flood-zone analysis</h2>
+      <div id="analysis"></div>
+    </section>
+
     <section class="card" aria-labelledby="h-results" id="resultsCard" hidden>
-      <h2 id="h-results">3. Flood data</h2>
+      <h2 id="h-results">Flood data at a point</h2>
       <div id="results"></div>
     </section>
 
@@ -53,6 +58,7 @@
       <h2 id="h-report">4. Report</h2>
       <label class="opt"><input type="checkbox" id="o-location" checked> Location summary</label>
       <label class="opt"><input type="checkbox" id="o-site" checked> Site boundary and measurements</label>
+      <label class="opt"><input type="checkbox" id="o-intersect" checked> Site flood-zone analysis (areas and %)</label>
       <label class="opt"><input type="checkbox" id="o-map" checked> Location map</label>
       <label class="opt"><input type="checkbox" id="o-zone" checked> Flood zone result</label>
       <label class="opt"><input type="checkbox" id="o-band" checked> Long-term risk band (England)</label>
@@ -86,6 +92,9 @@
     <div class="legend" id="legend">
       <strong>Map layers</strong>
       <span><span class="site-swatch"></span>Site boundary</span>
+      <span><span class="swatch" style="background:#1f4e99"></span>Site in Zone 3 / high likelihood</span>
+      <span><span class="swatch" style="background:#5b8fd6"></span>Site in Zone 2 / medium likelihood</span>
+      <span><span class="swatch" style="background:#a9c6ee"></span>Site in other mapped extent</span>
       <label><input type="checkbox" id="l-ez" checked> Flood zones 2 and 3 (England)</label>
       <label><input type="checkbox" id="l-er"> Risk band (England)</label>
       <label><input type="checkbox" id="l-w" checked> Flood zones (Wales)</label>
@@ -118,6 +127,9 @@
 <script src="js/flood-data/environment-agency.js"></script>
 <script src="js/flood-data/natural-resources-wales.js"></script>
 <script src="js/flood-data/sepa.js"></script>
+<script src="js/flood-data/data-normalisation.js"></script>
+<script src="js/analysis/intersections.js"></script>
+<script src="js/analysis/flood-analysis.js"></script>
 <script src="js/dashboard/results.js"></script>
 <script src="js/reporting/pdf-report.js"></script>
 <script src="js/app.js"></script>

@@ -116,9 +116,9 @@
     });
     await probe("EA surface water band attribute (York)", () => FRC.ea.surfaceWaterAtPoint(53.9572, -1.0812), (r) => [
       r.band && !/not stated/.test(r.band) ? "Pass" : "Check",
-      [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (read as ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
+      [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (found using ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
     await probe("EA risk band attribute (York)", () => FRC.ea.riskBand(53.9572, -1.0812), (r) => [
-      r.band && r.band !== "See details" ? "Pass" : "Check", [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (read as ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
+      r.band && r.band !== "See details" ? "Pass" : "Check", [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (found using ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
     // What the two map-image services say they support, in case the point
     // checks above return nothing.
     for (const [title, url] of [["EA risk band map service (capabilities)", FRC.config.api.eaRiskWms], ["EA surface water map service (capabilities)", FRC.config.api.eaSurfaceWms]]) {
@@ -174,6 +174,7 @@
   async function sites() {
     for (const [i, site] of SITES.entries()) {
       $("progress").textContent = `Analysing site ${i + 1} of ${SITES.length}: ${site.title.split(": ").pop()}…`;
+      render();
       await new Promise((r) => setTimeout(r, 0));
       try {
         const [a, ms] = await timed(() => FRC.floodAnalysis.analyseSite(site.features(), site.nation));
@@ -232,8 +233,9 @@
     results.length = 0; render();
     const btn = $("runBtn"); btn.disabled = true;
     const steps = [["Checking connections…", connections], ["Reading live data…", discovery], ["Analysing real sites (this can take a minute)…", sites], ["Testing imports…", imports], ["Testing failures…", failures]];
-    for (const [msg, fn] of steps) { $("progress").textContent = msg; await fn(); }
+    for (const [msg, fn] of steps) { $("progress").textContent = msg; render(); await fn(); }
     $("progress").textContent = "Finished. Copy the report below and send it back.";
+    render();
     btn.disabled = false;
   }
 

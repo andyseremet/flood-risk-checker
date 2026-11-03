@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Test site</name>
+<Placemark><name>North field</name><Polygon><outerBoundaryIs><LinearRing><coordinates>-1.546376862,53.765490761,0 -1.544859905,53.765485015,0 -1.54485019,53.766383787,0 -1.54636718,53.766389533,0 -1.546376862,53.765490761,0</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+<Placemark><name>South field</name><Polygon><outerBoundaryIs><LinearRing><coordinates>-1.546396225,53.763693216,0 -1.545637778,53.763690346,0 -1.54563293,53.764139732,0 -1.546391384,53.764142603,0 -1.546396225,53.763693216,0</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document></kml>

@@ -74,14 +74,79 @@
       const sb = T().bbox(site), box = [sb[0] - 1, sb[1] - 1, sb[2] + 1, sb[3] + 1];
       return features.filter((f) => {
         if (!f.geometry) return false;
-        try { return Boolean(intersect(site, clipToBox(toBNG(f.geometry), box))); } catch { return false; }
+        try { return Boolean(intersect(site, clipToBox(toBNG(f.geometry), box))); } catch {
+          try { return engine.estimateGroup(siteGeomsWGS, [{ key: "x", label: "x", rank: 1, geometry: f.geometry }], null, 2000).coveredArea > MIN_AREA; } catch { return false; }
+        }
       });
     },
 
     // siteGeomsWGS: array of Polygon/MultiPolygon geometries (parcels) in WGS84.
     // items: normalised flood polygons (WGS84) for ONE group, e.g. England.
     // Returns rows per class with exclusive area, % of site and overlap notes.
+    // Exact areas from polygon clipping. If the clipping library still fails
+    // on unusually complex data, areas are estimated from a sample grid so
+    // the dataset gets a result instead of a processing error.
     analyseGroup(siteGeomsWGS, items) {
+      try { return engine.exactGroup(siteGeomsWGS, items); } catch (e) {
+        if (/no area to analyse/.test(e.message)) throw e;
+        return engine.estimateGroup(siteGeomsWGS, items, e);
+      }
+    },
+
+    // Estimate: lay a regular grid of about `target` points over the site,
+    // and give each point inside the site to the most severe class whose
+    // polygon contains it. Area = share of points x site area. Accurate to
+    // roughly the grid spacing along each boundary (about 1% for 10,000 points).
+    estimateGroup(siteGeomsWGS, items, cause, target = 10000) {
+      const parcels = siteGeomsWGS.map(toBNG).filter(Boolean);
+      if (!parcels.length) throw new Error("The site boundary has no area to analyse.");
+      let siteArea;
+      try { siteArea = areaOf(unionAll(parcels)); } catch { siteArea = parcels.reduce((a, f) => a + areaOf(f), 0); }
+      const bb = parcels.map((f) => T().bbox(f)).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
+      const cell = Math.max(0.25, Math.sqrt(((bb[2] - bb[0]) * (bb[3] - bb[1])) / target));
+      const box = [bb[0] - 1, bb[1] - 1, bb[2] + 1, bb[3] + 1];
+      const inside = (x, y, f) => {
+        const g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+        return polys.some((pl) => FRC.util.inRing(x, y, pl[0]) && !pl.slice(1).some((h) => FRC.util.inRing(x, y, h)));
+      };
+      // Each flood polygon is cut to the site's box first (Sutherland-Hodgman,
+      // which does not fail on near-coincident edges).
+      const polys = items.map((it) => {
+        const f = clipToBox(toBNG(it.geometry), box);
+        return f ? { it, f, bb: T().bbox(f) } : null;
+      }).filter(Boolean);
+      const meta = new Map();
+      items.forEach((it) => { if (!meta.has(it.key)) meta.set(it.key, { key: it.key, label: it.label, rank: it.rank, n: 0, raw: 0 }); });
+      let total = 0, coveredN = 0;
+      for (let y = bb[1] + cell / 2; y < bb[3]; y += cell) {
+        for (let x = bb[0] + cell / 2; x < bb[2]; x += cell) {
+          if (!parcels.some((f) => inside(x, y, f))) continue;
+          total++;
+          const hits = new Set();
+          for (const p of polys) if (x >= p.bb[0] && x <= p.bb[2] && y >= p.bb[1] && y <= p.bb[3] && !hits.has(p.it.key) && inside(x, y, p.f)) hits.add(p.it.key);
+          if (!hits.size) continue;
+          coveredN++;
+          let best = null;
+          hits.forEach((k) => { const m = meta.get(k); m.raw++; if (!best || m.rank < best.rank) best = m; });
+          best.n++;
+        }
+      }
+      if (!total) throw cause;
+      const share = (n) => (siteArea * n) / total;
+      const ordered = [...meta.values()].sort((a, b) => a.rank - b.rank);
+      const rows = ordered.filter((m) => m.raw > 0).map((m) => ({ key: m.key, label: m.label, rank: m.rank, area: share(m.n), rawArea: share(m.raw), percent: (100 * m.n) / total, geometry: null }));
+      const overlaps = rows.filter((r) => r.rawArea - r.area > MIN_AREA).map((r) => ({ key: r.key, label: r.label, area: r.rawArea - r.area }));
+      const coveredArea = share(coveredN), remainingArea = Math.max(0, siteArea - coveredArea);
+      return {
+        siteArea, rows, polygonsReturned: items.length, coveredArea,
+        coveredPercent: (100 * coveredN) / total, remainingArea, remainingPercent: 100 - (100 * coveredN) / total,
+        remainingGeometry: null, overlaps,
+        extent: coveredN === 0 ? "none" : coveredN === total ? "whole" : "part",
+        estimate: { points: total, spacing: cell, reason: cause && cause.message },
+      };
+    },
+
+    exactGroup(siteGeomsWGS, items) {
       const site = unionAll(siteGeomsWGS.map(toBNG));
       const siteArea = areaOf(site);
       if (!site || siteArea <= 0) throw new Error("The site boundary has no area to analyse.");

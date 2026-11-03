@@ -121,4 +121,24 @@ test("Overlapping, detailed polygons with almost identical edges (as reservoir e
   assert.ok(res.rows[0].percent > 50 && res.rows[0].percent < 70, "outline covers about 55% of the square, got " + res.rows[0].percent);
 });
 
+test("Estimate fallback: the 60/20/20 spec example from a sample grid is within 1%", () => {
+  const items = FRC.normalise.ea([ea("FZ3", rect(E0 - 50, N0 - 50, 70, 200)), ea("FZ2", rect(E0 - 50, N0 - 50, 90, 200))]);
+  const r = FRC.intersections.estimateGroup(site, items, new Error("test"));
+  near(row(r, "FZ3").percent, 20, 1, "Zone 3 %");
+  near(row(r, "FZ2").percent, 20, 1, "Zone 2 % (outside Zone 3)");
+  near(r.remainingPercent, 60, 1, "no polygon %");
+  assert.strictEqual(r.extent, "part");
+  assert.ok(r.estimate.points > 9000, "uses about 10,000 points");
+});
+
+test("When exact clipping fails, analyseGroup returns an estimate instead of an error", () => {
+  const exact = FRC.intersections.exactGroup;
+  FRC.intersections.exactGroup = () => { throw new Error("Unable to complete output ring"); };
+  try {
+    const r = FRC.intersections.analyseGroup(site, FRC.normalise.ea([ea("FZ3", rect(E0, N0, 50, 100))]));
+    assert.ok(r.estimate, "result is marked as an estimate");
+    near(row(r, "FZ3").percent, 50, 1, "Zone 3 %");
+  } finally { FRC.intersections.exactGroup = exact; }
+});
+
 console.log(`\n${passed} tests passed`);

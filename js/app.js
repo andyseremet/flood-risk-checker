@@ -64,13 +64,10 @@
     state.site = site;
     // A point check from somewhere else no longer describes this site, and a
     // check at the old centroid is out of date. The report and dashboard must
-    // not mix them with the new boundary, so the centroid is checked again.
+    // not mix them with the new boundary. Nothing is fetched until Check is pressed.
     state.siteCheck = null; state.siteCheckSeq++;
     clearTimeout(centroidTimer);
-    if (v.features.length) centroidTimer = setTimeout(() => {
-      const c = state.site.measured && state.site.measured.centroidWGS;
-      if (c && !state.analysing) runCheck({ lat: c[1], lon: c[0], fromSite: true });
-    }, 800);
+    if (v.features.length && !state.analysing) $("status").textContent = site.auto ? "Pin placed. Press Check to start the flood checks." : "Site boundary ready. Press Check to start the flood checks.";
     // Any change to the boundary makes the previous analysis out of date.
     state.analysisSeq++;
     state.analysis = null;
@@ -100,8 +97,7 @@
     FRC.map.showPoint(lat, lon, Number($("radius").value), { fit: false });
     FRC.boundaryDraw.addFeatures([circle], { auto: true });
     FRC.boundaryDraw.zoomTo();
-    clearTimeout(centroidTimer); // the check below covers the centroid
-    runSiteCheck();
+    // The checks start only when Check is pressed.
   }
 
   function onSiteChange(kind) {
@@ -304,7 +300,8 @@
         $("status").textContent = "The postcode service returned no usable location. Check the postcode and try again.";
         return;
       }
-      if (FRC.boundaryDraw.hasOwn()) await runCheck({ lat: place.latitude, lon: place.longitude, place });
+      // Finding the postcode only places the pin; the checks start with Check.
+      if (FRC.boundaryDraw.hasOwn()) { FRC.map.get().setView([place.latitude, place.longitude], 15); $("status").textContent = "Your own boundary is the site. Press Clear all to put a pin at this postcode instead."; }
       else placePin(place.latitude, place.longitude, place);
     } catch (e) {
       const notFound = /404/.test(e.message);
@@ -386,23 +383,30 @@
     map.on("click", (e) => {
       if (FRC.boundaryDraw.isBusy() || state.building) return;
       // With a boundary of the user's own, a click is a separate point check.
-      if (FRC.boundaryDraw.hasOwn()) runCheck({ lat: e.latlng.lat, lon: e.latlng.lng });
+      // With a boundary of the user's own, that boundary stays the site.
+      if (FRC.boundaryDraw.hasOwn()) $("status").textContent = "Your own boundary is the site. Press Check to start, or Clear all to drop a pin instead.";
       else placePin(e.latlng.lat, e.latlng.lng);
     });
     // "i" buttons: click shows or hides the help text they point to.
     let helpOpenedAt = 0;
-    document.querySelectorAll("button.info, button.info-btn").forEach((b) => b.addEventListener("click", () => {
+    // One handler for every "i" button, including those drawn later in the
+    // results, so each opens or closes its note (and never folds a section).
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("button.info, button.info-btn");
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
       const t = $(b.getAttribute("aria-controls"));
+      if (!t) return;
       const open = t.hidden;
       // One note at a time.
-      document.querySelectorAll("button.info[aria-expanded=true], button.info-btn[aria-expanded=true]").forEach((o) => { if (o !== b) { $(o.getAttribute("aria-controls")).hidden = true; o.setAttribute("aria-expanded", "false"); } });
+      document.querySelectorAll("button.info[aria-expanded=true], button.info-btn[aria-expanded=true]").forEach((o) => { if (o !== b) { const n = $(o.getAttribute("aria-controls")); if (n) n.hidden = true; o.setAttribute("aria-expanded", "false"); } });
       t.hidden = !open; b.setAttribute("aria-expanded", String(open));
       helpOpenedAt = Date.now();
-    }));
+    });
     // Help notes stay open only while the user is reading them: moving the
     // map, scrolling, or pressing or tapping anything else closes them.
     const closeHelp = () => document.querySelectorAll("button.info[aria-expanded=true], button.info-btn[aria-expanded=true]").forEach((b) => {
-      $(b.getAttribute("aria-controls")).hidden = true; b.setAttribute("aria-expanded", "false");
+      const n = $(b.getAttribute("aria-controls")); if (n) n.hidden = true; b.setAttribute("aria-expanded", "false");
     });
     document.addEventListener("click", (e) => { if (!e.target.closest("button.info, button.info-btn, .help")) closeHelp(); }, true);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(); });
@@ -419,7 +423,8 @@
     $("searchToggle").addEventListener("click", () => openSearch($("searchPanel").hidden));
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("searchPanel").hidden) { openSearch(false); $("searchToggle").focus(); } });
     $("radius").addEventListener("change", () => {
-      [state.current, state.siteCheck].forEach((c) => { if (c) runCheck({ lat: c.lat, lon: c.lon, place: c.place, fromSite: c.fromSite }); });
+      // Takes effect at the next Check.
+      if (state.siteCheck || state.current) $("status").textContent = "Search radius changed. Press Check to update the warnings and gauges.";
     });
 
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.5.0">
+<link rel="stylesheet" href="assets/css/style.css?v=1.5.1">
 </head>
 <body>
 <div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
@@ -19,19 +19,14 @@
   </div>
 </div>
 <header>
-  <h1>Flood Risk Checker</h1>
-  <p>Professional Edition (in development) · Preliminary site screening for England, Wales and Scotland · PDF report</p>
+  <h1>Flood Risk Checker <button type="button" class="info" aria-expanded="false" aria-controls="help-app" title="Professional Edition (in development) · Preliminary site screening for England, Wales and Scotland · PDF report. How it works: 1. Pick a place: search a postcode or click the map. 2. Check: press Check under the map. 3. Report: download the PDF." aria-label="About this app">i</button></h1>
+  <p class="help header-help" id="help-app" hidden>Professional Edition (in development) · Preliminary site screening for England, Wales and Scotland · PDF report.<br>How it works: <strong>1. Pick a place</strong>: search a postcode or click the map. <strong>2. Check</strong>: press Check under the map. <strong>3. Report</strong>: download the PDF.</p>
 </header>
 <main>
   <div id="side">
-    <ol class="steps" aria-label="How it works">
-      <li><strong>Pick a place</strong><span>Search a postcode or click the map</span></li>
-      <li><strong>Check</strong><span>Press Check under the map</span></li>
-      <li><strong>Report</strong><span>Download the PDF</span></li>
-    </ol>
     <section class="card" aria-labelledby="h-site">
-      <h2 id="h-site">1. Site <button type="button" class="info" aria-expanded="false" aria-controls="help-site" title="The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid." aria-label="How the site works">i</button></h2>
-      <p class="help" id="help-site" hidden>The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid.</p>
+      <h2 id="h-site">1. Site <button type="button" class="info" aria-expanded="false" aria-controls="help-site" title="The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid (EPSG:27700) from the boundary's corner points." aria-label="How the site works">i</button></h2>
+      <p class="help" id="help-site" hidden>The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid (EPSG:27700) from the boundary's corner points.</p>
       <p class="hint">Try: <a href="#" data-pc="YO1 7HH">York</a> · <a href="#" data-pc="PH2 8AA">Perth</a> · <a href="#" data-pc="SA1 1NW">Swansea</a></p>
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Site name</span><input type="text" id="siteName" placeholder="e.g. Land north of Station Road"></label>
       <p class="hint" id="importMsg" role="status"></p>
@@ -45,8 +40,8 @@
     </section>
 
     <section class="card" aria-labelledby="h-report">
-      <h2 id="h-report">3. Report options <button type="button" class="info" aria-expanded="false" aria-controls="help-report" title="Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges." aria-label="How the report works">i</button></h2>
-      <p class="help" id="help-report" hidden>Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges.</p>
+      <h2 id="h-report">3. Report options <button type="button" class="info" aria-expanded="false" aria-controls="help-report" title="Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the summary and the data sources, method and limitations are always included." aria-label="How the report works">i</button></h2>
+      <p class="help" id="help-report" hidden>Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the summary and the data sources, method and limitations are always included.</p>
       <div class="grid2">
         <label>Prepared by<input type="text" id="analyst"></label>
         <label>Checked by<input type="text" id="checkedBy" placeholder="Second person"></label>
@@ -54,7 +49,6 @@
       <details class="more">
         <summary>More options</summary>
         <div class="more-body">
-      <p class="hint">Sections to include. The summary and the data sources, method and limitations are always included.</p>
       <label class="opt"><input type="checkbox" id="o-location" checked> 2. Site location plan</label>
       <label class="opt"><input type="checkbox" id="o-site" checked> 3. Site boundary and measurements</label>
       <label class="opt"><input type="checkbox" id="o-zone" checked> 4. Flood-zone assessment</label>
@@ -85,18 +79,15 @@
     <details class="card more-card">
       <summary>Data connections</summary>
     <section aria-labelledby="h-checks" class="card-inner">
-      <h2 id="h-checks" class="sr-only-h">Service status <button type="button" class="info" aria-expanded="false" aria-controls="help-checks" title="Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it." aria-label="How the connection test works">i</button></h2>
-      <p class="help" id="help-checks" hidden>Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it.</p>
-      <p class="hint">Shows whether this browser can reach each public service.</p>
+      <h2 id="h-checks" class="sr-only-h">Service status</h2>
+      <p class="help" id="help-checks" hidden>Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it. Connections are tested again before a check when the last test is over 5 minutes old; a service that takes over 5 seconds is marked Slow. To cut errors, the app tries a failed request again by itself (up to twice), runs at most 4 requests at once, and reuses map data fetched in the last hour. Pressing Check always fetches fresh data. Clear saved results forgets the saved data.</p>
       <ul class="checks" id="checks"></ul>
-      <div class="row"><button type="button" class="ghost" id="checkBtn">Test connections</button></div>
-      <p class="hint">Connections are tested again before a check when the last test is over 5 minutes old. A service that takes over 5 seconds is marked Slow.</p>
-      <p class="hint">To cut errors, the app tries a failed request again by itself (up to twice), runs at most 4 requests at once, and reuses map data fetched in the last hour. Pressing Check always fetches fresh data.</p>
+      <div class="row"><button type="button" class="ghost" id="checkBtn">Test connections</button><button type="button" class="info" aria-expanded="false" aria-controls="help-checks" title="Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it. Connections are tested again before a check when the last test is over 5 minutes old; a service that takes over 5 seconds is marked Slow. To cut errors, the app tries a failed request again by itself (up to twice), runs at most 4 requests at once, and reuses map data fetched in the last hour. Pressing Check always fetches fresh data. Clear saved results forgets the saved data." aria-label="How the connection test works">i</button></div>
       <div class="row"><button type="button" class="ghost" id="cacheClear">Clear saved results</button><span class="hint" id="cacheMsg" role="status"></span></div>
     </section>
     </details>
 
-    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.5.0.</span></footer>
+    <footer class="note">Open data under OGL v3.0 · Screening only, not an FRA · <span class="nowrap">Version 1.5.1</span> <button type="button" class="info" aria-expanded="false" aria-controls="help-foot" title="Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use." aria-label="Data sources and use">i</button><span class="help" id="help-foot" hidden>Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use.</span></footer>
   </div>
   <div id="mapwrap">
    <div id="mapbox">
@@ -115,12 +106,12 @@
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
         <input type="file" id="importInput" aria-label="Import a boundary file" accept=".geojson,.json,.kml,.zip,application/geo+json,application/vnd.google-earth.kml+xml,application/zip">
       </label>
-      <button type="button" class="map-btn info-btn" aria-expanded="false" aria-controls="help-map" title="On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site." aria-label="How the map works">i</button>
+      <button type="button" class="map-btn info-btn" aria-expanded="false" aria-controls="help-map" title="On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site. Nothing is fetched until you press Check under the map." aria-label="How the map works">i</button>
       <button type="button" class="map-btn layers-toggle" id="layersToggle" aria-controls="legend" aria-expanded="false" title="Map layers" aria-label="Show map layers">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3 2 8.5l10 5.5 10-5.5L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m2 12.5 10 5.5 10-5.5M2 16.5 12 22l10-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
       </button>
     </div>
-    <p class="help map-help" id="help-map" hidden>On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site.</p>
+    <p class="help map-help" id="help-map" hidden>On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site. Nothing is fetched until you press Check under the map.</p>
     <div class="legend" id="legend" hidden>
       <div class="legend-head"><strong>Map layers</strong><button type="button" class="link" id="layersClose" aria-label="Hide map layers">Close</button></div>
       <span><span class="site-swatch"></span>Site boundary</span>
@@ -148,7 +139,7 @@
         <button type="button" id="pdfBtn" disabled>Download PDF report</button>
         <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
         <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
-        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
+        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check starts every flood check for the selected site (the pin area or your boundary) and fills in the results. Nothing is fetched before you press it. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
       </div>
       <div class="errlog-panel" id="errLogPanel" role="region" aria-label="Error log" hidden>
         <div class="errlog-head">
@@ -164,7 +155,7 @@
         <p class="hint" id="errLogSummary"></p>
         <ol class="errlog-list" id="errLogList"></ol>
       </div>
-      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
+      <p class="help" id="help-bar" hidden>Check starts every flood check for the selected site (the pin area or your boundary) and fills in the results. Nothing is fetched before you press it. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
       <p class="hint" id="status" role="status"></p>
       <p class="msg warn net-warn" id="netWarnBox" role="status" hidden><span id="netWarn"></span><button type="button" id="netWarnClose" aria-label="Hide this warning" title="Hide">×</button></p>
     </div>
@@ -180,30 +171,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.5.0";</script>
-<script src="js/config.js?v=1.5.0"></script>
-<script src="js/util.js?v=1.5.0"></script>
-<script src="js/progress.js?v=1.5.0"></script>
-<script src="js/error-log.js?v=1.5.0"></script>
-<script src="js/geometry/projections.js?v=1.5.0"></script>
-<script src="js/geometry/measurements.js?v=1.5.0"></script>
-<script src="js/boundary/boundary-validation.js?v=1.5.0"></script>
-<script src="js/boundary/boundary-import.js?v=1.5.0"></script>
-<script src="js/boundary/boundary-export.js?v=1.5.0"></script>
-<script src="js/map/map.js?v=1.5.0"></script>
-<script src="js/map/map-layers.js?v=1.5.0"></script>
-<script src="js/boundary/boundary-draw.js?v=1.5.0"></script>
-<script src="js/location/location-search.js?v=1.5.0"></script>
-<script src="js/flood-data/environment-agency.js?v=1.5.0"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.5.0"></script>
-<script src="js/flood-data/sepa.js?v=1.5.0"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.5.0"></script>
-<script src="js/analysis/intersections.js?v=1.5.0"></script>
-<script src="js/analysis/compute.js?v=1.5.0"></script>
-<script src="js/analysis/flood-analysis.js?v=1.5.0"></script>
-<script src="js/dashboard/results.js?v=1.5.0"></script>
-<script src="js/reporting/assessment.js?v=1.5.0"></script>
-<script src="js/reporting/pdf-report.js?v=1.5.0"></script>
-<script src="js/app.js?v=1.5.0"></script>
+<script>window.FRC_VERSION = "1.5.1";</script>
+<script src="js/config.js?v=1.5.1"></script>
+<script src="js/util.js?v=1.5.1"></script>
+<script src="js/progress.js?v=1.5.1"></script>
+<script src="js/error-log.js?v=1.5.1"></script>
+<script src="js/geometry/projections.js?v=1.5.1"></script>
+<script src="js/geometry/measurements.js?v=1.5.1"></script>
+<script src="js/boundary/boundary-validation.js?v=1.5.1"></script>
+<script src="js/boundary/boundary-import.js?v=1.5.1"></script>
+<script src="js/boundary/boundary-export.js?v=1.5.1"></script>
+<script src="js/map/map.js?v=1.5.1"></script>
+<script src="js/map/map-layers.js?v=1.5.1"></script>
+<script src="js/boundary/boundary-draw.js?v=1.5.1"></script>
+<script src="js/location/location-search.js?v=1.5.1"></script>
+<script src="js/flood-data/environment-agency.js?v=1.5.1"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.5.1"></script>
+<script src="js/flood-data/sepa.js?v=1.5.1"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.5.1"></script>
+<script src="js/analysis/intersections.js?v=1.5.1"></script>
+<script src="js/analysis/compute.js?v=1.5.1"></script>
+<script src="js/analysis/flood-analysis.js?v=1.5.1"></script>
+<script src="js/dashboard/results.js?v=1.5.1"></script>
+<script src="js/reporting/assessment.js?v=1.5.1"></script>
+<script src="js/reporting/pdf-report.js?v=1.5.1"></script>
+<script src="js/app.js?v=1.5.1"></script>
 </body>
 </html>

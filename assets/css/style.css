@@ -160,3 +160,7 @@ details.more-card h2 { margin: 0; font-size: 12px; text-transform: uppercase; le
 .progress-steps .mini { display: inline-block; width: 36px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) 30%, color-mix(in srgb, var(--accent) 20%, transparent) 30%); background-size: 200% 100%; animation: slide 1.1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Circular "try again" button after Check, shown only when something failed. */
+button.round-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--panel); color: var(--warn); border: 2px solid var(--warn); }
+button.round-btn[hidden] { display: none; }

@@ -122,10 +122,31 @@
     return out;
   }
 
+  // Statuses that "Try again" fetches again.
+  const RETRY = ["unavailable", "error", "partial"];
+
   FRC.floodAnalysis = {
     STATUS,
     DATASETS,
+    RETRY,
     siteBox,
+
+    // Runs only the datasets that failed or came back partial again, and
+    // returns a new analysis with those replaced. The others are kept as they were.
+    async retryFailed(analysis, features) {
+      const geoms = features.map((f) => f.geometry);
+      const box = siteBox(geoms);
+      const centroid = FRC.measurements.measureSite(features).centroidWGS;
+      const P = FRC.progress;
+      const datasets = await Promise.all(analysis.datasets.map((d) => {
+        const def = DATASETS.find((x) => x.id === d.id);
+        if (!def || !RETRY.includes(d.status)) return d;
+        const job = def.kind === "point" ? runPointDataset(def, centroid) : runDataset(def, geoms, box);
+        const label = "Again: site " + def.name.replace(/^(Environment Agency|Natural Resources Wales|SEPA) /, "").split(" (")[0];
+        return P ? P.track(job.then((r) => (RETRY.slice(0, 2).includes(r.status) ? Promise.reject(r) : r)), label).catch((r) => r) : job;
+      }));
+      return { ...analysis, datasets };
+    },
 
     // features: validated WGS84 site parcels. nation: from the centroid lookup.
     async analyseSite(features, nation) {

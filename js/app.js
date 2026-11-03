@@ -46,6 +46,7 @@
       site: state.site, current: reportCheck(), analysis: state.analysis,
       siteName: $("siteName").value.trim(), analysing: state.analysing, analysisError: state.analysisError,
     });
+    updateRetry();
   }
 
   // ---------- Site boundary ----------
@@ -157,18 +158,7 @@
     const nation = FRC.location.nationOf(place);
     const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {} };
 
-    const isEng = nation === "England", isWal = nation === "Wales", isSco = nation === "Scotland", unknown = nation === "Unknown";
-    const tasks = [];
-    const job = (label, p) => tasks.push(FRC.progress.track(p, label).catch(() => {}));
-    if (isEng || unknown) job("Flood zone at the point (England)", FRC.ea.zoneAtPoint(lat, lon).then((v) => { if (isEng || v.zone) res.zone = { kind: "england", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
-    if (isWal || unknown) job("Flood zone at the point (Wales)", FRC.nrw.zoneAtPoint(lat, lon).then((v) => { if (isWal || v.hits.length) res.zone = { kind: "wales", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
-    if (isSco || unknown) job("Flood maps at the point (Scotland)", FRC.sepa.floodAtPoint(lat, lon).then((v) => { if (isSco || Object.keys(v.found).length) res.zone = { kind: "scotland", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
-    if (isEng || unknown) {
-      job("Long-term risk band", FRC.ea.riskBand(lat, lon).then((v) => (res.band = v)).catch((e) => { res.errors.band = e.message; throw e; }));
-      job("Flood warnings", FRC.ea.liveWarnings(lat, lon, dist).then((v) => { res.live = v; res.liveAt = new Date(); }).catch((e) => { res.errors.live = e.message; throw e; }));
-      job("River gauges", FRC.ea.nearbyGauges(lat, lon, dist).then((v) => { res.gauges = v; res.liveAt = res.liveAt || new Date(); }).catch((e) => { res.errors.gauges = e.message; throw e; }));
-    }
-    await Promise.all(tasks);
+    await Promise.all(pointJobs(res).map((t) => FRC.progress.track(t.run(), t.label).catch(() => {})));
     // A later map click or postcode search takes precedence over this response.
     if (stale()) return res;
 
@@ -178,6 +168,72 @@
     $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover your site boundary, not this point. Press Clear all to check this point instead." : "");
     $("pdfBtn").disabled = !pdfReady();
     return res;
+  }
+
+  // The point checks for one result. Each job writes its answer, or its error
+  // under its key, into res, so a failed one can be run again on its own.
+  function pointJobs(res) {
+    const { lat, lon, dist, nation } = res;
+    const isEng = nation === "England", isWal = nation === "Wales", isSco = nation === "Scotland", unknown = nation === "Unknown";
+    const jobs = [];
+    const job = (key, label, fn) => jobs.push({ key, label, run: () => fn().catch((e) => { res.errors[key] = e.message; throw e; }) });
+    if (isEng || unknown) job("zone", "Flood zone at the point (England)", () => FRC.ea.zoneAtPoint(lat, lon).then((v) => { if (isEng || v.zone) res.zone = { kind: "england", ...v }; }));
+    if (isWal || unknown) job("zone", "Flood zone at the point (Wales)", () => FRC.nrw.zoneAtPoint(lat, lon).then((v) => { if (isWal || v.hits.length) res.zone = { kind: "wales", ...v }; }));
+    if (isSco || unknown) job("zone", "Flood maps at the point (Scotland)", () => FRC.sepa.floodAtPoint(lat, lon).then((v) => { if (isSco || Object.keys(v.found).length) res.zone = { kind: "scotland", ...v }; }));
+    if (isEng || unknown) {
+      job("band", "Long-term risk band", () => FRC.ea.riskBand(lat, lon).then((v) => (res.band = v)));
+      job("live", "Flood warnings", () => FRC.ea.liveWarnings(lat, lon, dist).then((v) => { res.live = v; res.liveAt = new Date(); }));
+      job("gauges", "River gauges", () => FRC.ea.nearbyGauges(lat, lon, dist).then((v) => { res.gauges = v; res.liveAt = res.liveAt || new Date(); }));
+    }
+    return jobs;
+  }
+
+  // ---------- Try again for the parts that failed ----------
+  // Only failed parts are fetched again; results that came back stay as they are.
+  const failedConnections = () => CHECKS.map((c, i) => i).filter((i) => { const el = $("chk" + i); return el && el.classList.contains("bad"); });
+  const failedAnalysis = () => (state.analysis ? state.analysis.datasets.filter((d) => FRC.floodAnalysis.RETRY.includes(d.status)) : []);
+  const failedPoint = (res) => (res ? Object.keys(res.errors) : []);
+  function failures() {
+    return failedPoint(state.current).length + failedPoint(state.siteCheck).length + failedAnalysis().length + failedConnections().length + (state.analysisError ? 1 : 0);
+  }
+  function updateRetry() {
+    const n = failures(), btn = $("retryBtn");
+    btn.hidden = n === 0 || state.retrying;
+    btn.title = `Try again for the ${n} part${n === 1 ? "" : "s"} that failed. Results that worked are kept.`;
+    btn.setAttribute("aria-label", btn.title);
+  }
+  async function retryFailed() {
+    if (state.retrying) return;
+    state.retrying = true; updateRetry();
+    try {
+      const work = [];
+      // Point checks: run each failed job again.
+      [state.current, state.siteCheck].forEach((res) => {
+        if (!res || !failedPoint(res).length) return;
+        const keys = failedPoint(res);
+        keys.forEach((k) => delete res.errors[k]);
+        work.push(Promise.all(pointJobs(res).filter((j) => keys.includes(j.key))
+          .map((j) => FRC.progress.track(j.run(), "Again: " + j.label).catch(() => {}))).then(() => { res.when = new Date(); if (res === reportCheck()) FRC.map.showGauges(res.gauges); }));
+      });
+      // Site datasets that were unavailable, failed or only partly returned.
+      if (state.analysisError && state.site.features.length) { state.analysisError = null; work.push(runSiteCheck()); }
+      else if (failedAnalysis().length) {
+        const seq = state.analysisSeq, a = state.analysis;
+        work.push(FRC.floodAnalysis.retryFailed(a, state.site.features).then((b) => {
+          if (seq !== state.analysisSeq) return; // the site changed meanwhile
+          state.analysis = b; FRC.map.showAnalysis(b);
+        }));
+      }
+      // Data connections that were blocked.
+      const blocked = failedConnections();
+      if (blocked.length) work.push(testConnections(blocked));
+      await Promise.all(work);
+    } finally {
+      state.retrying = false;
+      renderDashboard();
+      const n = failures();
+      $("status").textContent = n ? `Tried again. ${n} part${n === 1 ? " still has" : "s still have"} no result.` : "Tried again. Everything came back.";
+    }
   }
 
   // Point checks at the centroid, then the site-wide flood-zone intersection.
@@ -240,14 +296,18 @@
     ["Flood zones (Natural Resources Wales)", () => FRC.nrw.zoneAtPoint(51.62, -3.94)],
     ["Flood maps (SEPA)", () => FRC.sepa.floodAtPoint(56.396, -3.437)],
   ];
-  async function testConnections() {
+  // only: indexes of the checks to run again (the others keep their result).
+  async function testConnections(only) {
     const ul = $("checks");
-    ul.innerHTML = CHECKS.map((c, i) => `<li><span>${esc(c[0])}</span><span class="pill neutral" id="chk${i}">Testing</span></li>`).join("");
-    await Promise.all(CHECKS.map(async (c, i) => {
-      const el = $("chk" + i);
+    if (!only || !ul.children.length) ul.innerHTML = CHECKS.map((c, i) => `<li><span>${esc(c[0])}</span><span class="pill neutral" id="chk${i}">Testing</span></li>`).join("");
+    const which = only || CHECKS.map((c, i) => i);
+    await Promise.all(which.map(async (i) => {
+      const c = CHECKS[i], el = $("chk" + i);
+      el.className = "pill neutral"; el.textContent = "Testing"; el.title = "";
       try { await c[1](); el.className = "pill info"; el.textContent = "Working"; }
       catch (e) { el.className = "pill bad"; el.textContent = "Blocked"; el.title = e.message; }
     }));
+    updateRetry();
     // The panel is folded away; open it when a service cannot be reached.
     const blocked = ul.querySelectorAll(".pill.bad").length;
     const panel = ul.closest("details");
@@ -305,6 +365,7 @@
     $("importInput").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ""; });
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
     $("siteCheckBtn").addEventListener("click", runSiteCheck);
+    $("retryBtn").addEventListener("click", retryFailed);
     $("siteName").addEventListener("input", renderDashboard);
     $("siteInfo").addEventListener("click", (e) => {
       const z = e.target.closest("[data-zoom]"), r = e.target.closest("[data-remove]");
@@ -326,7 +387,7 @@
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
       state.building = false; btn.disabled = !pdfReady(); btn.textContent = "Download PDF report";
     });
-    $("checkBtn").addEventListener("click", testConnections);
+    $("checkBtn").addEventListener("click", () => testConnections());
 
     $("company").value = store.get("company") || "";
     $("company").addEventListener("input", () => store.set("company", $("company").value.trim()));

@@ -98,4 +98,27 @@ test("Unknown EA zone value is kept as its own class, not dropped", () => {
   near(r.rows[0].area, 5000, 0.5, "unclassified area");
 });
 
+test("Overlapping, detailed polygons with almost identical edges (as reservoir extents) do not break the clipping", () => {
+  // Six 3,000-point outlines whose edges differ by fractions of a micrometre.
+  // Before coordinate snapping, Turf failed on this case with
+  // "Unable to complete output ring".
+  let r = 1002;
+  const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647);
+  const outline = () => {
+    const pts = [];
+    for (let i = 0; i < 3000; i++) {
+      const a = (2 * Math.PI * i) / 3000, rad = 500 + 50 * Math.sin(7 * a) + 1e-7 * (rnd() - 0.5);
+      pts.push([E0 + rad * Math.cos(a) + 1e-9 * (rnd() - 0.5), N0 + rad * Math.sin(a)]);
+    }
+    pts.push(pts[0]);
+    return P.geometryToWGS84({ type: "Polygon", coordinates: [pts] });
+  };
+  const big = [rect(E0 - 600, N0 - 600, 1200, 1200)];
+  const items = FRC.normalise.eaReservoir(Array.from({ length: 6 }, () => ({ geometry: outline(), properties: {} })));
+  const res = FRC.intersections.analyseGroup(big, items);
+  assert.strictEqual(res.rows.length, 1);
+  near(res.rows[0].area + res.remainingArea, 1440000, 1, "areas add up to the site");
+  assert.ok(res.rows[0].percent > 50 && res.rows[0].percent < 70, "outline covers about 55% of the square, got " + res.rows[0].percent);
+});
+
 console.log(`\n${passed} tests passed`);

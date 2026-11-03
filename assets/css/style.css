@@ -180,3 +180,9 @@ button.round-btn.small { width: 30px; height: 30px; }
 .errlog-list .err-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .errlog-list .err-msg { margin-top: 2px; font-size: 12px; overflow-wrap: anywhere; }
 .errlog-list .err-hint { margin-top: 2px; color: var(--muted); }
+.errlog-list .err-link { margin-top: 2px; }
+/* Shown over the bottom of the map, so the map keeps its size. */
+.net-warn { position: absolute; z-index: 950; left: 12px; right: 12px; bottom: calc(100% + 8px); margin: 0; display: flex; gap: 8px; align-items: flex-start; box-shadow: 0 1px 6px rgb(0 0 0 / 0.2); }
+.net-warn span { flex: 1; }
+.net-warn button { flex: none; padding: 0 4px; background: none; border: 0; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.net-warn[hidden] { display: none; }

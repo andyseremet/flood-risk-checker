@@ -127,23 +127,17 @@
     siteBox,
 
     // features: validated WGS84 site parcels. nation: from the centroid lookup.
-    // onProgress (optional): called with the ids of the datasets still running.
-    async analyseSite(features, nation, onProgress) {
+    async analyseSite(features, nation) {
       const geoms = features.map((f) => f.geometry);
       const box = siteBox(geoms);
       const started = new Date();
       const centroid = FRC.measurements.measureSite(features).centroidWGS;
       const wanted = DATASETS.filter((d) => d.kind !== "none" && (nation === "Unknown" || d.nation === nation));
       const notAssessed = (d, reason) => Promise.resolve({ id: d.id, nation: d.nation, name: d.name, status: "notAssessed", statusText: STATUS.notAssessed, groups: [], notes: [reason] });
-      const running = new Set();
-      const track = (d, p) => {
-        running.add(d.id);
-        return p.finally(() => { running.delete(d.id); if (onProgress) onProgress([...running]); });
-      };
       const results = await Promise.all(DATASETS.map((d) => {
         if (d.kind === "none") return notAssessed(d, d.reason);
         if (!wanted.includes(d)) return notAssessed(d, `The site centroid is not in ${d.nation}.`);
-        return track(d, d.kind === "point" ? runPointDataset(d, centroid) : runDataset(d, geoms, box));
+        return d.kind === "point" ? runPointDataset(d, centroid) : runDataset(d, geoms, box);
       }));
       const notes = [];
       if (nation === "Northern Ireland") notes.push("Northern Ireland flood map data is not open, so the site cannot be analysed.");

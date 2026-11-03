@@ -59,7 +59,6 @@
 
   const compute = {
     LIMITS,
-    get usingWorker() { return !onPage; },
 
     async analyseGroup(geoms, items) {
       if (onPage) return I().analyseGroup(geoms, items);

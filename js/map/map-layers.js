@@ -19,8 +19,22 @@
         if (box.checked) layers[k].addTo(map);
         box.addEventListener("change", () => (box.checked ? layers[k].addTo(map) : map.removeLayer(layers[k])));
       }
+      // The layers panel stays closed until the layers button is clicked.
       const legend = document.getElementById("legend");
+      const toggle = document.getElementById("layersToggle");
+      const close = document.getElementById("layersClose");
       if (legend) { L.DomEvent.disableClickPropagation(legend); L.DomEvent.disableScrollPropagation(legend); }
+      if (legend && toggle) {
+        L.DomEvent.disableClickPropagation(toggle);
+        const setOpen = (open) => {
+          legend.hidden = !open;
+          toggle.setAttribute("aria-expanded", String(open));
+          toggle.setAttribute("aria-label", open ? "Hide map layers" : "Show map layers");
+        };
+        toggle.addEventListener("click", () => setOpen(legend.hidden));
+        if (close) close.addEventListener("click", () => { setOpen(false); toggle.focus(); });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !legend.hidden) { setOpen(false); toggle.focus(); } });
+      }
       return layers;
     },
   };

@@ -29,6 +29,13 @@
   FRC.mapLayers = {
     sepaVisible: [0, 1, 2], // River flooding high, medium, low likelihood
     sepaMinZoom: SEPA_MIN_ZOOM,
+    tileErrors: {}, // layer key -> layer name, for layers with tiles that failed to load
+    onTileError: null,
+    retryTiles() {
+      const keys = Object.keys(FRC.mapLayers.tileErrors);
+      FRC.mapLayers.tileErrors = {};
+      keys.forEach((k) => { const l = FRC.mapLayers.layers[k]; if (l && l._map) l.redraw(); });
+    },
     init(map) {
       const A = FRC.config.api;
       const opts = { format: "image/png", transparent: true, opacity: 0.6, crossOrigin: true, minZoom: 10 };
@@ -45,6 +52,14 @@
       for (const k of Object.keys(layers)) {
         const box = document.getElementById("l-" + k);
         if (!box) continue;
+        // Note a layer whose map tiles fail to load, so the error log can show it
+        // and Try again can draw it again.
+        const name = box.parentElement.textContent.replace(/, shows when zoomed in close/, "").trim();
+        layers[k].on("tileerror", () => {
+          if (FRC.mapLayers.tileErrors[k]) return;
+          FRC.mapLayers.tileErrors[k] = name;
+          if (FRC.mapLayers.onTileError) FRC.mapLayers.onTileError();
+        });
         if (box.checked) layers[k].addTo(map);
         box.addEventListener("change", () => (box.checked ? layers[k].addTo(map) : map.removeLayer(layers[k])));
       }

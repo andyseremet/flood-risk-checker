@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.3.0">
+<link rel="stylesheet" href="assets/css/style.css?v=1.4.0">
 </head>
 <body>
 <div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
@@ -93,7 +93,7 @@
     </section>
     </details>
 
-    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.3.0.</span></footer>
+    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.4.0.</span></footer>
   </div>
   <div id="mapwrap">
    <div id="mapbox">
@@ -125,10 +125,10 @@
       <span><span class="swatch" style="background:#5b8fd6"></span>Site in Zone 2 / medium likelihood</span>
       <span><span class="swatch" style="background:#a9c6ee"></span>Site in other mapped extent</span>
       <label><input type="checkbox" id="l-ez" checked> Flood zones 2 and 3 (England)</label>
-      <label><input type="checkbox" id="l-er"> Risk band (England)</label>
-      <label><input type="checkbox" id="l-sw"> Surface water (England, shows when zoomed in close)</label>
-      <label><input type="checkbox" id="l-res"> Reservoir flood extents (England)</label>
-      <label><input type="checkbox" id="l-rec"> Recorded floods (England)</label>
+      <label><input type="checkbox" id="l-er" checked> Risk band (England)</label>
+      <label><input type="checkbox" id="l-sw" checked> Surface water (England, shows when zoomed in close)</label>
+      <label><input type="checkbox" id="l-res" checked> Reservoir flood extents (England)</label>
+      <label><input type="checkbox" id="l-rec" checked> Recorded floods (England)</label>
       <label><input type="checkbox" id="l-w" checked> Flood zones (Wales)</label>
       <label><input type="checkbox" id="l-s" checked> River flooding (Scotland, shows when zoomed in close)</label>
     </div>
@@ -139,12 +139,29 @@
         <button type="button" class="round-btn" id="retryBtn" hidden title="Try again for the parts that failed" aria-label="Try again for the parts that failed">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
+        <span class="errlog" id="errLog" hidden>
+          <button type="button" class="link errlog-toggle" id="errLogToggle" aria-expanded="false" aria-controls="errLogPanel" title="Show the error log">Error log</button>
+        </span>
         <button type="button" id="pdfBtn" disabled>Download PDF report</button>
         <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
         <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
-        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
+        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service and a hint. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
       </div>
-      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
+      <div class="errlog-panel" id="errLogPanel" role="region" aria-label="Error log" hidden>
+        <div class="errlog-head">
+          <strong>Error log</strong>
+          <button type="button" class="round-btn small" id="errLogRetry" hidden title="Try again for the parts that failed" aria-label="Try again for the parts that failed">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+          <span class="spacer"></span>
+          <button type="button" class="link" id="errLogCopy">Copy log</button>
+          <button type="button" class="link" id="errLogClear">Clear</button>
+          <button type="button" class="link" id="errLogClose">Close</button>
+        </div>
+        <p class="hint" id="errLogSummary"></p>
+        <ol class="errlog-list" id="errLogList"></ol>
+      </div>
+      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service and a hint. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
       <p class="hint" id="status" role="status"></p>
     </div>
   </div>
@@ -159,29 +176,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.3.0";</script>
-<script src="js/config.js?v=1.3.0"></script>
-<script src="js/util.js?v=1.3.0"></script>
-<script src="js/progress.js?v=1.3.0"></script>
-<script src="js/geometry/projections.js?v=1.3.0"></script>
-<script src="js/geometry/measurements.js?v=1.3.0"></script>
-<script src="js/boundary/boundary-validation.js?v=1.3.0"></script>
-<script src="js/boundary/boundary-import.js?v=1.3.0"></script>
-<script src="js/boundary/boundary-export.js?v=1.3.0"></script>
-<script src="js/map/map.js?v=1.3.0"></script>
-<script src="js/map/map-layers.js?v=1.3.0"></script>
-<script src="js/boundary/boundary-draw.js?v=1.3.0"></script>
-<script src="js/location/location-search.js?v=1.3.0"></script>
-<script src="js/flood-data/environment-agency.js?v=1.3.0"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.3.0"></script>
-<script src="js/flood-data/sepa.js?v=1.3.0"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.3.0"></script>
-<script src="js/analysis/intersections.js?v=1.3.0"></script>
-<script src="js/analysis/compute.js?v=1.3.0"></script>
-<script src="js/analysis/flood-analysis.js?v=1.3.0"></script>
-<script src="js/dashboard/results.js?v=1.3.0"></script>
-<script src="js/reporting/assessment.js?v=1.3.0"></script>
-<script src="js/reporting/pdf-report.js?v=1.3.0"></script>
-<script src="js/app.js?v=1.3.0"></script>
+<script>window.FRC_VERSION = "1.4.0";</script>
+<script src="js/config.js?v=1.4.0"></script>
+<script src="js/util.js?v=1.4.0"></script>
+<script src="js/progress.js?v=1.4.0"></script>
+<script src="js/error-log.js?v=1.4.0"></script>
+<script src="js/geometry/projections.js?v=1.4.0"></script>
+<script src="js/geometry/measurements.js?v=1.4.0"></script>
+<script src="js/boundary/boundary-validation.js?v=1.4.0"></script>
+<script src="js/boundary/boundary-import.js?v=1.4.0"></script>
+<script src="js/boundary/boundary-export.js?v=1.4.0"></script>
+<script src="js/map/map.js?v=1.4.0"></script>
+<script src="js/map/map-layers.js?v=1.4.0"></script>
+<script src="js/boundary/boundary-draw.js?v=1.4.0"></script>
+<script src="js/location/location-search.js?v=1.4.0"></script>
+<script src="js/flood-data/environment-agency.js?v=1.4.0"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.4.0"></script>
+<script src="js/flood-data/sepa.js?v=1.4.0"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.4.0"></script>
+<script src="js/analysis/intersections.js?v=1.4.0"></script>
+<script src="js/analysis/compute.js?v=1.4.0"></script>
+<script src="js/analysis/flood-analysis.js?v=1.4.0"></script>
+<script src="js/dashboard/results.js?v=1.4.0"></script>
+<script src="js/reporting/assessment.js?v=1.4.0"></script>
+<script src="js/reporting/pdf-report.js?v=1.4.0"></script>
+<script src="js/app.js?v=1.4.0"></script>
 </body>
 </html>

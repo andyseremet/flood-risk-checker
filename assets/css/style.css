@@ -90,3 +90,4 @@ table.data tr.muted td { color: var(--muted); }
 table.data tr.total td { font-weight: 700; border-bottom: 0; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 [hidden] { display: none !important; }
+ul.hint { padding-left: 18px; margin: 4px 0 0; }

@@ -34,7 +34,9 @@
       analysisLayer.clearLayers();
       if (!analysis) return;
       const fill = { 1: "#1f4e99", 2: "#5b8fd6", 3: "#a9c6ee" };
-      analysis.datasets.forEach((d) => (d.groups || []).forEach((g) => g.rows.forEach((r) => {
+      // Only the flood-zone datasets are shaded; reservoir and recorded
+      // outlines would hide them. Those are available as map layers instead.
+      analysis.datasets.filter((d) => d.primary).forEach((d) => (d.groups || []).forEach((g) => g.rows.forEach((r) => {
         if (!r.geometry) return;
         L.geoJSON(r.geometry, { interactive: true, style: { color: fill[r.rank] || "#5b8fd6", weight: 1, fillColor: fill[r.rank] || "#5b8fd6", fillOpacity: 0.55 } })
           .bindTooltip(`${g.group}: ${r.label}, ${FRC.util.fmtNum(r.area, 0)} m² (${r.percent.toFixed(1)}%)`, { sticky: true })

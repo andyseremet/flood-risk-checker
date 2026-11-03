@@ -41,7 +41,7 @@
         if (hasSite) para(`Site area ${fmtNum(site.measured.area, 0)} m² (${fmtNum(site.measured.hectares, 2)} ha) in ${site.measured.parcels.length} parcel${site.measured.parcels.length > 1 ? "s" : ""}.`);
         if (analysis) {
           analysis.datasets.filter((d) => d.status !== "notAssessed").forEach((d) => {
-            if (!d.groups || !d.groups.length) { para(`${d.name}: ${d.statusText}.`); return; }
+            if (!d.groups || !d.groups.length) { para(`${d.name}: ${d.summary ? d.summary + " " : ""}Status: ${d.statusText}.`); return; }
             d.groups.forEach((g) => para(`${g.group}: ${FRC.results.groupFinding(g, d.noneText)} Status: ${d.statusText}.`));
           });
           analysis.notes.forEach((n) => para(n));
@@ -74,7 +74,7 @@
       }
 
       if (S.intersect && hasSite) {
-        h2("Flood-zone spatial intersection");
+        h2("Site flood analysis (spatial intersection)");
         if (!analysis) para("Not assessed: the site-wide analysis was not run.");
         else {
           analysis.datasets.forEach((d) => {
@@ -82,6 +82,7 @@
             doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text(doc.splitTextToSize(d.name, CW), M, y + 4); y += 6;
             kv("Status", d.statusText + (d.retrieved ? `  (retrieved ${fmtDate(d.retrieved)})` : ""));
             if (d.error) para("Reason: " + d.error, 9);
+            if (d.summary) kv("Finding", d.summary);
             (d.groups || []).forEach((g) => {
               if (d.groups.length > 1 || g.group !== d.nation) kv("Group", g.group);
               g.rows.forEach((r) => kv(r.label, `${fmtNum(r.area, 0)} m²  ·  ${r.percent.toFixed(1)}% of site`));

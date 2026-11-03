@@ -85,6 +85,7 @@
       assessed.forEach((d) => {
         html += `<div class="result"><div class="title"><span>${esc(d.name)}</span>${pill(ANALYSIS_PILL[d.status], d.statusText)}</div>`;
         if (d.error) html += `<p>${esc(d.error)}</p>`;
+        if (d.summary) html += `<p>${esc(d.summary)}</p>`;
         (d.groups || []).forEach((g) => {
           if (d.groups.length > 1 || g.group !== d.nation) html += `<p><strong>${esc(g.group)}</strong></p>`;
           html += `<p>${esc(groupFinding(g, d.noneText))}</p>` + analysisTable(g, d.noneText);
@@ -93,7 +94,7 @@
         if (d.retrieved) html += `<p class="hint">Data retrieved ${esc(fmtDate(d.retrieved))}.</p>`;
         html += `</div>`;
       });
-      if (skipped.length) html += `<p class="hint">Not assessed: ${skipped.map((d) => esc(d.name.split(" (")[0])).join("; ")} (site is not in that nation).</p>`;
+      if (skipped.length) html += `<p class="hint"><strong>Not assessed</strong></p><ul class="hint">${skipped.map((d) => `<li>${esc(d.name.split(" (")[0])}: ${esc(d.notes[0] || "")}</li>`).join("")}</ul>`;
       html += `<p class="hint">Areas are calculated in British National Grid by intersecting the site boundary with each dataset's polygons. Flood polygons are not assumed to be a complete partition: overlaps are counted once, in the more severe class.</p>`;
       el.innerHTML = html;
     },

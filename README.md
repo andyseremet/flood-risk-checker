@@ -49,6 +49,17 @@ Each dataset gets a status: Analysis completed, No mapped feature identified, Pa
 
 This exact case is one of the automated tests.
 
+### Other flood information (England)
+
+| Dataset | How it is assessed |
+|---|---|
+| Reservoir flood extents (wet day) | Area and % of the site, plus the names of the reservoirs whose extent reaches it. A credible worst case with no likelihood. |
+| Recorded flood outlines | Area and % of the site, plus the name, dates, source and cause of each recorded flood that reaches it. Not a complete record. |
+| Risk of Flooding from Surface Water | Checked at the site centroid only. The EA publishes it as map images, not polygons, so its area cannot be measured. |
+| Groundwater | Always "Not assessed": there is no open national groundwater flood dataset. |
+
+These England datasets are shown as "Not assessed" for sites in Wales and Scotland. Scotland's surface water extents are already part of the SEPA analysis.
+
 ## Validation
 
 A boundary is rejected, with a message saying why, when it is empty, has fewer than 3 corners, has zero area, crosses itself, or uses an unsupported coordinate system. Point and line shapes are ignored with a warning. Shapes outside the UK get a warning.
@@ -60,6 +71,9 @@ A boundary is rejected, with a message saying why, when it is empty, has fewer t
 | Location | [postcodes.io](https://api.postcodes.io/docs/overview) | Whole UK |
 | Flood zone | EA Flood Map for Planning, NRW Flood Map for Planning, SEPA Flood Maps | England, Wales, Scotland |
 | Long-term risk band | EA Risk of Flooding from Rivers and Sea | England |
+| Surface water | EA Risk of Flooding from Surface Water (WMS); SEPA surface water extents | England, Scotland |
+| Reservoir flooding | EA Reservoir Flood Extents, wet day (OGC API) | England |
+| Historic flooding | EA Recorded Flood Outlines (OGC API) | England |
 | Live warnings and river gauges | [EA flood monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference) | England |
 
 A missing result is never shown as low risk. Each dataset gets a status: Data retrieved, No mapped feature identified, Not assessed or Service unavailable. Northern Ireland flood map data is not open, so it is not assessed.
@@ -103,11 +117,12 @@ npm install
 npm test
 ```
 
-The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon), check that invalid shapes are rejected, and check the flood-zone intersections (the 60/20/20 example, a site outside all zones, a whole site in Zone 3, overlapping polygons, overlapping parcels, a site with a hole, and SEPA likelihood bands).
+The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon), check that invalid shapes are rejected, and check the flood-zone intersections (the 60/20/20 example, a site outside all zones, a whole site in Zone 3, overlapping polygons, overlapping parcels, a site with a hole, and SEPA likelihood bands). The site analysis tests replace the services with fixed responses and check the reservoir, recorded flood and surface water results, their statuses when nothing is mapped or a service is down, and the reasons given for datasets that are not assessed.
 
 ## Known limitations
 
-- The long-term risk band, live warnings and gauges are still point checks at the site centroid.
+- The long-term risk band, surface water, live warnings and gauges are still point checks at the site centroid.
+- Surface water, reservoir and historic flooding are not yet added for Wales (NRW).
 - The site's nation comes from its centroid. A site that crosses the England/Wales or England/Scotland border is analysed only against the centroid's agency.
 - The NRW layer's zone field has not been confirmed against live data. Polygons whose zone can't be read are shown as "zone not stated".
 - Very large sites can hit a service's result limit. This is reported as Partial coverage.

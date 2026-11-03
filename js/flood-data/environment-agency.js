@@ -7,12 +7,8 @@
   const box = (lat, lon, d = 0.0005) => [lon - d, lat - d, lon + d, lat + d];
 
   // Reads the attributes of a WMS layer at a point (GetFeatureInfo).
-  // Servers differ in which response formats they support and in whether an
-  // unsupported format is refused or answered with an empty result, so the
-  // common formats are tried in turn. Returns the first feature's properties,
-  // or null when every format answered with no feature. `tried` records each
-  // attempt for the test page.
-  const INFO_FORMATS = ["application/json", "application/geojson", "application/geo+json", "text/xml"];
+  // Returns the first feature's properties, or null when every attempt
+  // answered with no feature. `tried` records each attempt for the test page.
   function parseInfo(text, format) {
     const t = text.trim();
     if (format !== "text/xml" || t.startsWith("{")) {
@@ -37,23 +33,39 @@
     if (/ServiceException/i.test(t)) throw new Error("service exception: " + t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160));
     return { props: null, count: 0 };
   }
+  // The live service (GeoServer) answered an EPSG:4326 point query with no
+  // feature inside Flood Zone 3 at York, while its map images draw correctly
+  // in Web Mercator. So the point is asked for first in Web Mercator (the
+  // same system as the map), then in British National Grid, then in the
+  // two EPSG:4326 axis orders. A small pixel buffer helps at polygon edges.
+  function pointQueries(lat, lon) {
+    const R = 6378137, x = (R * lon * Math.PI) / 180, y = R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+    const m = 25; // metres either side
+    const [e, n] = FRC.projections.toBNG([lon, lat]);
+    const d = 0.0005;
+    return [
+      { system: "EPSG:3857", q: `version=1.3.0&crs=EPSG:3857&bbox=${[x - m, y - m, x + m, y + m].join(",")}&i=50&j=50` },
+      { system: "EPSG:27700", q: `version=1.3.0&crs=EPSG:27700&bbox=${[e - m, n - m, e + m, n + m].join(",")}&i=50&j=50` },
+      { system: "EPSG:4326 lat,lon", q: `version=1.3.0&crs=EPSG:4326&bbox=${[lat - d, lon - d, lat + d, lon + d].join(",")}&i=50&j=50` },
+      { system: "EPSG:4326 lon,lat (WMS 1.1.1)", q: `version=1.1.1&srs=EPSG:4326&bbox=${[lon - d, lat - d, lon + d, lat + d].join(",")}&x=50&y=50` },
+    ];
+  }
   async function wmsPointInfo(wmsUrl, layer, lat, lon) {
-    const d = 0.0005, bbox = [lat - d, lon - d, lat + d, lon + d].join(",");
     const tried = [];
     let lastError = null;
-    for (const format of INFO_FORMATS) {
-      const url = `${wmsUrl}?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&styles=&crs=EPSG:4326&bbox=${bbox}&width=101&height=101&i=50&j=50&info_format=${encodeURIComponent(format)}&feature_count=5`;
+    for (const { system, q } of pointQueries(lat, lon)) {
+      const url = `${wmsUrl}?service=WMS&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&styles=&${q}&width=101&height=101&info_format=application/json&feature_count=5&buffer=3`;
       const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
       try {
         const res = await fetch(url, { signal: ctrl.signal });
         const text = await res.text();
         if (!res.ok) throw new Error("HTTP " + res.status);
-        const r = parseInfo(text, format);
-        tried.push({ format, features: r.count, sample: text.slice(0, 200) });
-        if (r.props) return { props: r.props, format, tried };
+        const r = parseInfo(text, "application/json");
+        tried.push({ system, features: r.count, ...(r.count ? {} : { sample: text.slice(0, 120) }) });
+        if (r.props) return { props: r.props, format: system, tried };
       } catch (e) {
         lastError = e.name === "AbortError" ? new Error("timed out after 15 s") : e;
-        tried.push({ format, error: lastError.message.slice(0, 160) });
+        tried.push({ system, error: lastError.message.slice(0, 160) });
       } finally { clearTimeout(timer); }
     }
     if (tried.every((t) => t.error)) throw lastError;

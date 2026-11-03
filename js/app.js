@@ -67,7 +67,7 @@
     // not mix them with the new boundary. Nothing is fetched until Check is pressed.
     state.siteCheck = null; state.siteCheckSeq++;
     clearTimeout(centroidTimer);
-    if (v.features.length && !state.analysing) $("status").textContent = site.auto ? "Pin placed. Press Check to start the flood checks." : "Site boundary ready. Press Check to start the flood checks.";
+    if (v.features.length && !state.analysing) setStatus(site.auto ? "Pin placed. Press Check to start the flood checks." : "Site boundary ready. Press Check to start the flood checks.");
     // Any change to the boundary makes the previous analysis out of date.
     state.analysisSeq++;
     state.analysis = null;
@@ -143,10 +143,10 @@
     if (fromSite) state.siteCheck = null; else state.current = null;
     $("pdfBtn").disabled = !pdfReady();
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      $("status").textContent = "The selected coordinates are invalid. Please choose another location.";
+      setStatus("The selected coordinates are invalid. Please choose another location.");
       return null;
     }
-    $("status").textContent = "Checking flood data…";
+    setStatus("Checking flood data…");
     precheck();
     FRC.map.showPoint(lat, lon, dist, { fit: !fromSite });
 
@@ -162,7 +162,7 @@
     FRC.map.showGauges(res.gauges);
     if (fromSite) state.siteCheck = res; else state.current = res;
     renderDashboard();
-    $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover your site boundary, not this point. Press Clear all to check this point instead." : "");
+    setStatus(`Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover your site boundary, not this point. Press Clear to check this point instead." : ""));
     $("pdfBtn").disabled = !pdfReady();
     return res;
   }
@@ -261,7 +261,7 @@
       renderDashboard();
       state.justRetried = false;
       const n = failures();
-      $("status").textContent = n ? `Tried again. ${n} part${n === 1 ? " still has" : "s still have"} no result.` : "Tried again. Everything came back.";
+      setStatus(n ? `Tried again. ${n} part${n === 1 ? " still has" : "s still have"} no result.` : "Tried again. Everything came back.");
     }
   }
 
@@ -298,20 +298,20 @@
   async function searchPostcode(pc) {
     pc = String(pc || "").trim();
     if (!pc) return;
-    if (!FRC.location.isPostcode(pc)) { $("status").textContent = "That doesn't look like a UK postcode. Check it, for example YO1 7HH."; return; }
-    $("status").textContent = "Looking up postcode…";
+    if (!FRC.location.isPostcode(pc)) { setStatus("That doesn't look like a UK postcode. Check it, for example YO1 7HH."); return; }
+    setStatus("Looking up postcode…");
     try {
       const place = await FRC.progress.track(FRC.location.lookupPostcode(pc), "Finding the postcode");
       if (!place || !Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
-        $("status").textContent = "The postcode service returned no usable location. Check the postcode and try again.";
+        setStatus("The postcode service returned no usable location. Check the postcode and try again.");
         return;
       }
       // Finding the postcode only places the pin; the checks start with Check.
-      if (FRC.boundaryDraw.hasOwn()) { FRC.map.get().setView([place.latitude, place.longitude], 15); $("status").textContent = "Your own boundary is the site. Press Clear all to put a pin at this postcode instead."; }
+      if (FRC.boundaryDraw.hasOwn()) { FRC.map.get().setView([place.latitude, place.longitude], 15); setStatus("Your own boundary is the site. Press Clear to put a pin at this postcode instead."); }
       else placePin(place.latitude, place.longitude, place);
     } catch (e) {
       const notFound = /404/.test(e.message);
-      $("status").textContent = notFound ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.";
+      setStatus(notFound ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.");
       if (!notFound) FRC.errorLog.note("Postcode lookup: " + pc, e.message, e.url);
     }
   }
@@ -328,19 +328,32 @@
     ["Flood zones (Natural Resources Wales)", () => FRC.nrw.zoneAtPoint(51.62, -3.94)],
     ["Flood maps (SEPA)", () => FRC.sepa.floodAtPoint(56.396, -3.437)],
   ];
+  // Messages under the map show for a few seconds, then fade; every message
+  // is kept in the Log, so the map area stays clean.
+  let statusTimer = null;
+  function setStatus(text) {
+    const el = $("status");
+    clearTimeout(statusTimer);
+    el.classList.remove("fade");
+    el.textContent = text;
+    if (!text) return;
+    if (!/…$/.test(text)) FRC.errorLog.info(text);
+    statusTimer = setTimeout(() => { el.classList.add("fade"); statusTimer = setTimeout(() => { el.textContent = ""; el.classList.remove("fade"); }, 700); }, /…$/.test(text) ? 60000 : 5000);
+  }
   const SLOW_S = 5;
   // A short warning under the map when a service is blocked or slow, so the
   // user knows before the results come back.
+  let lastNetWarning = "";
   function showNetWarning() {
-    const el = $("netWarn");
-    if (!el) return;
     const blocked = [], slow = [];
     CHECKS.forEach((c, i) => { const p = $("chk" + i); if (!p) return; if (p.classList.contains("bad")) blocked.push(c[0]); else if (p.dataset.slow) slow.push(`${c[0]} (${p.dataset.slow} s)`); });
     const parts = [];
     if (blocked.length) parts.push(`Not reachable right now: ${blocked.join(", ")}. Results from ${blocked.length === 1 ? "it" : "them"} may be missing.`);
     if (slow.length) parts.push(`Slow right now: ${slow.join(", ")}. The check may take longer.`);
-    el.textContent = parts.join(" ");
-    $("netWarnBox").hidden = !parts.length;
+    // Shown briefly under the map and kept in the Log; never drawn over the map.
+    const text = parts.join(" ");
+    if (text && text !== lastNetWarning) setStatus(text);
+    lastNetWarning = text;
   }
   // Before a check, test the connections again if the last test is over
   // PRECHECK_MIN minutes old. It runs alongside the check, not before it.
@@ -390,7 +403,7 @@
       if (FRC.boundaryDraw.isBusy() || state.building) return;
       // With a boundary of the user's own, a click is a separate point check.
       // With a boundary of the user's own, that boundary stays the site.
-      if (FRC.boundaryDraw.hasOwn()) $("status").textContent = "Your own boundary is the site. Press Check to start, or Clear all to drop a pin instead.";
+      if (FRC.boundaryDraw.hasOwn()) setStatus("Your own boundary is the site. Press Check to start, or Clear to drop a pin instead.");
       else placePin(e.latlng.lat, e.latlng.lng);
     });
     // "i" buttons: click shows or hides the help text they point to.
@@ -430,7 +443,7 @@
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("searchPanel").hidden) { openSearch(false); $("searchToggle").focus(); } });
     $("radius").addEventListener("change", () => {
       // Takes effect at the next Check.
-      if (state.siteCheck || state.current) $("status").textContent = "Search radius changed. Press Check to update the warnings and gauges.";
+      if (state.siteCheck || state.current) setStatus("Search radius changed. Press Check to update the warnings and gauges.");
     });
 
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());
@@ -443,7 +456,6 @@
     // Try again always asks the services again, never saved results.
     $("retryBtn").addEventListener("click", () => FRC.util.fresh(retryFailed));
     $("errLogRetry").addEventListener("click", () => FRC.util.fresh(retryFailed));
-    $("netWarnClose").addEventListener("click", () => { $("netWarnBox").hidden = true; });
     FRC.errorLog.init();
     FRC.mapLayers.onTileError = updateRetry;
     $("siteName").addEventListener("input", renderDashboard);
@@ -457,7 +469,7 @@
     $("pdfBtn").addEventListener("click", async () => {
       const btn = $("pdfBtn");
       if (state.building) return;
-      state.building = true; btn.disabled = true; btn.textContent = "Building PDF…";
+      state.building = true; btn.disabled = true; btn.querySelector("span").textContent = "Building…";
       try {
         await FRC.progress.track(FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
           company: $("company").value.trim(), logo: state.logo,
@@ -465,8 +477,8 @@
           gaps: failingParts().filter((g) => !/^(tile|conn):/.test(g.key)),
           sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         }), "Building the PDF report");
-      } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
-      state.building = false; btn.disabled = !pdfReady(); btn.textContent = "Download PDF report";
+      } catch (e) { setStatus("Could not build the PDF: " + e.message); }
+      state.building = false; btn.disabled = !pdfReady(); btn.querySelector("span").textContent = "Report";
     });
     $("checkBtn").addEventListener("click", () => testConnections());
 

@@ -55,18 +55,22 @@
     let lastError = null;
     for (const { system, q } of pointQueries(lat, lon)) {
       const url = `${wmsUrl}?service=WMS&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&styles=&${q}&width=101&height=101&info_format=application/json&feature_count=5&buffer=3`;
-      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
-      try {
-        const res = await fetch(url, { signal: ctrl.signal });
-        const text = await res.text();
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const r = parseInfo(text, "application/json");
-        tried.push({ system, features: r.count, ...(r.count ? {} : { sample: text.slice(0, 120) }) });
-        if (r.props) return { props: r.props, format: system, tried };
-      } catch (e) {
-        lastError = e.name === "AbortError" ? new Error("timed out after 15 s") : e;
-        tried.push({ system, error: lastError.message.slice(0, 160) });
-      } finally { clearTimeout(timer); }
+      // One retry: the surface water service sometimes drops a request.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
+        try {
+          const res = await fetch(url, { signal: ctrl.signal });
+          const text = await res.text();
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const r = parseInfo(text, "application/json");
+          tried.push({ system, features: r.count, ...(r.count ? {} : { sample: text.slice(0, 120) }) });
+          if (r.props) return { props: r.props, format: system, tried };
+          break;
+        } catch (e) {
+          lastError = e.name === "AbortError" ? new Error("timed out after 15 s") : e;
+          if (attempt === 2) tried.push({ system, error: lastError.message.slice(0, 160) });
+        } finally { clearTimeout(timer); }
+      }
     }
     if (tried.every((t) => t.error)) throw lastError;
     return { props: null, format: null, tried };

@@ -112,7 +112,7 @@ Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), P
 
 ## Releasing a change
 
-The page loads its scripts and styles with a version tag (`?v=2026-11-03.14`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
+The page loads its scripts and styles with a version tag (`?v=2026-11-03.15`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
 
 ```bash
 sed -i 's/2026-11-03\.11/NEW/g' index.html diagnostics.html

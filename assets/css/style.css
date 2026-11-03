@@ -30,7 +30,7 @@ main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 0; h
 #mapwrap { position: relative; min-width: 0; display: flex; flex-direction: column; }
 #mapbox { position: relative; flex: 1; min-height: 0; }
 #map { position: absolute; inset: 0; }
-.mapbar { padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
+.mapbar { position: relative; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; gap: 6px; }
 .mapbar .hint { margin: 0; }
 .map-tools { position: absolute; z-index: 600; top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .map-btn { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); cursor: pointer; font-weight: 600; }
@@ -164,3 +164,19 @@ details.more-card h2 { margin: 0; font-size: 12px; text-transform: uppercase; le
 /* Circular "try again" button after Check, shown only when something failed. */
 button.round-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; background: var(--panel); color: var(--warn); border: 2px solid var(--warn); }
 button.round-btn[hidden] { display: none; }
+button.round-btn.small { width: 30px; height: 30px; }
+/* Error log: a link in the button row, opening a panel over the bottom of the map
+   so the map keeps its size and position. */
+.errlog[hidden] { display: none; }
+.errlog-toggle.bad { color: var(--warn); font-weight: 600; }
+.errlog-panel { position: absolute; z-index: 1000; left: 12px; right: 12px; bottom: calc(100% + 8px); max-height: min(50vh, 420px); overflow-y: auto; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 2px 12px rgb(0 0 0 / 0.25); font-size: 13px; }
+.errlog-panel[hidden] { display: none; }
+.errlog-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.errlog-head .spacer { flex: 1; }
+.errlog-panel .hint { margin: 6px 0; }
+.errlog-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.errlog-list li { border-top: 1px solid var(--line); padding-top: 6px; }
+.errlog-list li.fixed { opacity: .7; }
+.errlog-list .err-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.errlog-list .err-msg { margin-top: 2px; font-size: 12px; overflow-wrap: anywhere; }
+.errlog-list .err-hint { margin-top: 2px; color: var(--muted); }

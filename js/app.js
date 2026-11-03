@@ -193,14 +193,36 @@
   const failedConnections = () => CHECKS.map((c, i) => i).filter((i) => { const el = $("chk" + i); return el && el.classList.contains("bad"); });
   const failedAnalysis = () => (state.analysis ? state.analysis.datasets.filter((d) => FRC.floodAnalysis.RETRY.includes(d.status)) : []);
   const failedPoint = (res) => (res ? Object.keys(res.errors) : []);
+  const failedTiles = () => Object.keys(FRC.mapLayers.tileErrors || {});
   function failures() {
-    return failedPoint(state.current).length + failedPoint(state.siteCheck).length + failedAnalysis().length + failedConnections().length + (state.analysisError ? 1 : 0);
+    return failedPoint(state.current).length + failedPoint(state.siteCheck).length + failedAnalysis().length + failedConnections().length + failedTiles().length + (state.analysisError ? 1 : 0);
+  }
+  // Every part failing now, for the error log.
+  function failingParts() {
+    const out = [];
+    [[state.current, "pt", "Point"], [state.siteCheck, "site", "Site centre"]].forEach(([res, tag, where]) => {
+      if (!res) return;
+      const jobs = pointJobs(res);
+      failedPoint(res).forEach((k) => { const j = jobs.find((x) => x.key === k); out.push({ key: `${tag}:${k}`, what: `${where}: ${j ? j.label : k}`, message: res.errors[k] }); });
+    });
+    failedAnalysis().forEach((d) => out.push({ key: "ds:" + d.id, what: "Site: " + d.name, message: d.error || (d.status === "partial" ? "Only part of the data came back. " + (d.notes || []).join(" ") : d.statusText) }));
+    if (state.analysisError) out.push({ key: "analysis", what: "Site analysis", message: state.analysisError });
+    failedConnections().forEach((i) => out.push({ key: "conn:" + i, what: "Connection: " + CHECKS[i][0], message: $("chk" + i).title }));
+    failedTiles().forEach((k) => out.push({ key: "tile:" + k, what: "Map layer: " + FRC.mapLayers.tileErrors[k], message: "Some map tiles did not load." }));
+    return out;
   }
   function updateRetry() {
-    const n = failures(), btn = $("retryBtn");
-    btn.hidden = n === 0 || state.retrying;
-    btn.title = `Try again for the ${n} part${n === 1 ? "" : "s"} that failed. Results that worked are kept.`;
-    btn.setAttribute("aria-label", btn.title);
+    const n = failures();
+    const title = `Try again for the ${n} part${n === 1 ? "" : "s"} that failed. Results that worked are kept.`;
+    ["retryBtn", "errLogRetry"].forEach((id) => {
+      const btn = $(id);
+      if (!btn) return;
+      btn.hidden = n === 0 || state.retrying;
+      btn.title = title; btn.setAttribute("aria-label", title);
+    });
+    // While trying again, parts are briefly cleared before they run, so the
+    // log is only updated once the retry has finished.
+    if (!state.retrying) FRC.errorLog.sync(failingParts(), { retried: state.justRetried });
   }
   async function retryFailed() {
     if (state.retrying) return;
@@ -224,13 +246,17 @@
           state.analysis = b; FRC.map.showAnalysis(b);
         }));
       }
+      // Map layers with tiles that did not load: draw them again.
+      if (failedTiles().length) FRC.mapLayers.retryTiles();
       // Data connections that were blocked.
       const blocked = failedConnections();
       if (blocked.length) work.push(testConnections(blocked));
       await Promise.all(work);
     } finally {
       state.retrying = false;
+      state.justRetried = true;
       renderDashboard();
+      state.justRetried = false;
       const n = failures();
       $("status").textContent = n ? `Tried again. ${n} part${n === 1 ? " still has" : "s still have"} no result.` : "Tried again. Everything came back.";
     }
@@ -257,8 +283,8 @@
       state.analysis = a;
       state.analysing = false;
       renderDashboard();
+      // The map and the page stay where they are, so the pinned place stays in view.
       FRC.map.showAnalysis(a);
-      $("dashCard").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       if (seq === state.analysisSeq) { state.analysing = false; state.analysisError = e.message; renderDashboard(); }
     } finally {
@@ -280,7 +306,9 @@
       if (FRC.boundaryDraw.hasOwn()) await runCheck({ lat: place.latitude, lon: place.longitude, place });
       else placePin(place.latitude, place.longitude, place);
     } catch (e) {
-      $("status").textContent = /404/.test(e.message) ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.";
+      const notFound = /404/.test(e.message);
+      $("status").textContent = notFound ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.";
+      if (!notFound) FRC.errorLog.note("Postcode lookup: " + pc, e.message);
     }
   }
 
@@ -366,6 +394,9 @@
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
     $("siteCheckBtn").addEventListener("click", runSiteCheck);
     $("retryBtn").addEventListener("click", retryFailed);
+    $("errLogRetry").addEventListener("click", retryFailed);
+    FRC.errorLog.init();
+    FRC.mapLayers.onTileError = updateRetry;
     $("siteName").addEventListener("input", renderDashboard);
     $("siteInfo").addEventListener("click", (e) => {
       const z = e.target.closest("[data-zoom]"), r = e.target.closest("[data-remove]");

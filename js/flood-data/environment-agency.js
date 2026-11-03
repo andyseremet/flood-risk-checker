@@ -6,6 +6,60 @@
   const FRC = (root.FRC = root.FRC || {});
   const box = (lat, lon, d = 0.0005) => [lon - d, lat - d, lon + d, lat + d];
 
+  // Reads the attributes of a WMS layer at a point (GetFeatureInfo).
+  // Servers differ in which response formats they support and in whether an
+  // unsupported format is refused or answered with an empty result, so the
+  // common formats are tried in turn. Returns the first feature's properties,
+  // or null when every format answered with no feature. `tried` records each
+  // attempt for the test page.
+  const INFO_FORMATS = ["application/json", "application/geojson", "application/geo+json", "text/xml"];
+  function parseInfo(text, format) {
+    const t = text.trim();
+    if (format !== "text/xml" || t.startsWith("{")) {
+      const j = JSON.parse(t);
+      const f = (j.features || j.results || [])[0];
+      if (!f) return { props: null, count: (j.features || j.results || []).length };
+      return { props: f.properties || f.attributes || {}, count: (j.features || j.results).length };
+    }
+    // ArcGIS: <FIELDS a="1" b="2"/>; GeoServer/MapServer GML: <layer_feature><name>v</name>…
+    const fields = t.match(/<FIELDS\s([^>]*)\/?>/i);
+    if (fields) {
+      const props = {};
+      fields[1].replace(/([\w:.-]+)="([^"]*)"/g, (m, k, v) => { props[k] = v; return m; });
+      return { props, count: 1 };
+    }
+    const feat = t.match(/<(\w+:)?\w+_feature>([\s\S]*?)<\/(\w+:)?\w+_feature>/);
+    if (feat) {
+      const props = {};
+      feat[2].replace(/<(?:\w+:)?(\w+)>([^<]*)<\/(?:\w+:)?\1>/g, (m, k, v) => { props[k] = v; return m; });
+      return { props, count: 1 };
+    }
+    if (/ServiceException/i.test(t)) throw new Error("service exception: " + t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160));
+    return { props: null, count: 0 };
+  }
+  async function wmsPointInfo(wmsUrl, layer, lat, lon) {
+    const d = 0.0005, bbox = [lat - d, lon - d, lat + d, lon + d].join(",");
+    const tried = [];
+    let lastError = null;
+    for (const format of INFO_FORMATS) {
+      const url = `${wmsUrl}?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&styles=&crs=EPSG:4326&bbox=${bbox}&width=101&height=101&i=50&j=50&info_format=${encodeURIComponent(format)}&feature_count=5`;
+      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal });
+        const text = await res.text();
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const r = parseInfo(text, format);
+        tried.push({ format, features: r.count, sample: text.slice(0, 200) });
+        if (r.props) return { props: r.props, format, tried };
+      } catch (e) {
+        lastError = e.name === "AbortError" ? new Error("timed out after 15 s") : e;
+        tried.push({ format, error: lastError.message.slice(0, 160) });
+      } finally { clearTimeout(timer); }
+    }
+    if (tried.every((t) => t.error)) throw lastError;
+    return { props: null, format: null, tried };
+  }
+
   // All features of an OGC API Features collection whose bounding box touches
   // bbox [minLon, minLat, maxLon, maxLat]. Follows the service's "next" links.
   async function itemsInBox(itemsUrl, bbox, { pageSize = 500, maxPages = 10 } = {}) {
@@ -42,15 +96,11 @@
     // Risk of Flooding from Surface Water (NaFRA2). Published as map images
     // only (WMS), so it can be checked at points but not measured as an area.
     async surfaceWaterAtPoint(lat, lon) {
-      const d = 0.0005, bbox = [lat - d, lon - d, lat + d, lon + d].join(",");
-      const url = `${FRC.config.api.eaSurfaceWms}?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=rofsw&query_layers=rofsw&crs=EPSG:4326&bbox=${bbox}&width=101&height=101&i=50&j=50&info_format=application/json&feature_count=5`;
-      const r = await FRC.util.getJSON(url);
-      const f = (r.features || [])[0];
+      const r = await wmsPointInfo(FRC.config.api.eaSurfaceWms, "rofsw", lat, lon);
       // No feature means "no surface water risk band mapped at this point", not "very low".
-      if (!f) return { band: null, raw: null, retrieved: new Date() };
-      const p = f.properties || {};
-      const key = Object.keys(p).find((k) => /band|risk|prob|likel|chance/i.test(k));
-      return { band: key ? String(p[key]) : "Mapped (band not stated in data)", raw: p, retrieved: new Date() };
+      if (!r.props) return { band: null, raw: null, tried: r.tried, retrieved: new Date() };
+      const key = Object.keys(r.props).find((k) => /band|risk|prob|likel|chance/i.test(k));
+      return { band: key ? String(r.props[key]) : "Mapped (band not stated in data)", raw: r.props, format: r.format, tried: r.tried, retrieved: new Date() };
     },
 
     // Point check against Flood Zones 2 and 3. The service publishes only
@@ -67,15 +117,11 @@
     },
 
     async riskBand(lat, lon) {
-      const d = 0.0005, bbox = [lat - d, lon - d, lat + d, lon + d].join(",");
-      const url = `${FRC.config.api.eaRiskWms}?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=rofrs_4band&query_layers=rofrs_4band&crs=EPSG:4326&bbox=${bbox}&width=101&height=101&i=50&j=50&info_format=application/json&feature_count=5`;
-      const r = await FRC.util.getJSON(url);
-      const f = (r.features || [])[0];
+      const r = await wmsPointInfo(FRC.config.api.eaRiskWms, "rofrs_4band", lat, lon);
       // No feature here means "no risk band mapped at this point", not "very low".
-      if (!f) return { band: null, raw: null, retrieved: new Date() };
-      const p = f.properties || {};
-      const key = Object.keys(p).find((k) => /risk|band|prob/i.test(k));
-      return { band: key ? String(p[key]) : "See details", raw: p, retrieved: new Date() };
+      if (!r.props) return { band: null, raw: null, tried: r.tried, retrieved: new Date() };
+      const key = Object.keys(r.props).find((k) => /risk|band|prob/i.test(k));
+      return { band: key ? String(r.props[key]) : "See details", raw: r.props, format: r.format, tried: r.tried, retrieved: new Date() };
     },
 
     async liveWarnings(lat, lon, dist) {

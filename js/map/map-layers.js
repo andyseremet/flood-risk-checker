@@ -3,7 +3,32 @@
   "use strict";
   const FRC = (root.FRC = root.FRC || {});
 
+  // SEPA's WMS does not support Web Mercator (EPSG:3857) and its layer names
+  // carry generated suffixes, so Scotland is drawn from the ArcGIS REST
+  // "export" operation instead, which reprojects on request. SEPA only draws
+  // these layers at 1:85,000 or closer, so the layer starts at zoom 13.
+  const SEPA_MIN_ZOOM = 13;
+  function sepaLayer(base, opts) {
+    const Layer = L.TileLayer.extend({
+      getTileUrl(c) {
+        const size = this.getTileSize();
+        const nw = this._map.unproject(c.scaleBy(size), c.z);
+        const se = this._map.unproject(c.add([1, 1]).scaleBy(size), c.z);
+        const a = L.CRS.EPSG3857.project(nw), b = L.CRS.EPSG3857.project(se);
+        const q = new URLSearchParams({
+          bbox: [a.x, b.y, b.x, a.y].join(","), bboxSR: "3857", imageSR: "3857",
+          size: size.x + "," + size.y, dpi: "96", format: "png32", transparent: "true",
+          layers: "show:" + FRC.mapLayers.sepaVisible.join(","), f: "image",
+        });
+        return base + "/export?" + q.toString();
+      },
+    });
+    return new Layer("", { opacity: opts.opacity, crossOrigin: opts.crossOrigin, minZoom: SEPA_MIN_ZOOM, maxZoom: 19 });
+  }
+
   FRC.mapLayers = {
+    sepaVisible: [0, 1, 2], // River flooding high, medium, low likelihood
+    sepaMinZoom: SEPA_MIN_ZOOM,
     init(map) {
       const A = FRC.config.api;
       const opts = { format: "image/png", transparent: true, opacity: 0.6, crossOrigin: true, minZoom: 10 };
@@ -11,7 +36,7 @@
         ez: L.tileLayer.wms(A.eaZonesWms, { ...opts, layers: "Flood_Zones_2_3_Rivers_and_Sea" }),
         er: L.tileLayer.wms(A.eaRiskWms, { ...opts, layers: "rofrs_4band" }),
         w: L.tileLayer.wms(A.nrw, { ...opts, layers: A.nrwLayer }),
-        s: L.tileLayer.wms(A.sepaWms, { ...opts, layers: "0,1,2" }),
+        s: sepaLayer(A.sepa, opts),
       };
       for (const k of Object.keys(layers)) {
         const box = document.getElementById("l-" + k);

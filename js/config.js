@@ -13,7 +13,6 @@
       nrw: "https://datamap.gov.wales/geoserver/ows",
       nrwLayer: "inspire-nrw:NRW_FLOODZONE_RIVERS_SEAS_MERGED",
       sepa: "https://map.sepa.org.uk/server/rest/services/Open/Flood_Maps/MapServer",
-      sepaWms: "https://map.sepa.org.uk/server/services/Open/Flood_Maps/MapServer/WMSServer",
     },
 
     // SEPA Flood_Maps MapServer layer ids -> [source, likelihood]

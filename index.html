@@ -51,14 +51,20 @@
 
     <section class="card" aria-labelledby="h-report">
       <h2 id="h-report">4. Report</h2>
-      <label class="opt"><input type="checkbox" id="o-location" checked> Location summary</label>
-      <label class="opt"><input type="checkbox" id="o-site" checked> Site boundary and measurements</label>
-      <label class="opt"><input type="checkbox" id="o-intersect" checked> Site flood analysis (areas and %)</label>
-      <label class="opt"><input type="checkbox" id="o-map" checked> Location map</label>
-      <label class="opt"><input type="checkbox" id="o-zone" checked> Flood zone result</label>
-      <label class="opt"><input type="checkbox" id="o-band" checked> Long-term risk band (England)</label>
-      <label class="opt"><input type="checkbox" id="o-live" checked> Live warnings and alerts</label>
-      <label class="opt"><input type="checkbox" id="o-gauges"> Nearby river gauges</label>
+      <p class="hint">The executive summary and the data sources, methodology and limitations are always included.</p>
+      <label class="opt"><input type="checkbox" id="o-location" checked> 2. Site location plan</label>
+      <label class="opt"><input type="checkbox" id="o-site" checked> 3. Site boundary and measurements</label>
+      <label class="opt"><input type="checkbox" id="o-zone" checked> 4. Flood-zone assessment</label>
+      <label class="opt"><input type="checkbox" id="o-intersect" checked> 5. Flood-zone spatial intersection (areas and %)</label>
+      <label class="opt"><input type="checkbox" id="o-other" checked> 6. Additional flood information</label>
+      <label class="opt"><input type="checkbox" id="o-live" checked> 7. Flood warnings and river gauges</label>
+      <label class="opt"><input type="checkbox" id="o-maps" checked> Include maps</label>
+      <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Company name</span><input type="text" id="company" placeholder="Shown on every page"></label>
+      <div class="row">
+        <label class="filebtn ghost">Add logo<input type="file" id="logoInput" accept="image/png,image/jpeg"></label>
+        <button type="button" class="link" id="logoClear" hidden>Remove logo</button>
+        <span class="hint" id="logoMsg"></span>
+      </div>
       <div class="grid2">
         <label>Search radius
           <select id="radius"><option value="1">1 km</option><option value="2" selected>2 km</option><option value="5">5 km</option></select>
@@ -70,7 +76,6 @@
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Analyst name</span><input type="text" id="analyst"></label>
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Notes (printed on page one)</span><textarea id="notes"></textarea></label>
       <div class="row"><button type="button" id="pdfBtn" disabled>Download PDF report</button></div>
-      <p class="hint">Sources, data status and the disclaimer are always included.</p>
     </section>
 
     <section class="card" aria-labelledby="h-checks">

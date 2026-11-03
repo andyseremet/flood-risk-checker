@@ -91,7 +91,9 @@
       const byGroup = new Map();
       items.forEach((it) => { if (!byGroup.has(it.group)) byGroup.set(it.group, []); byGroup.get(it.group).push(it); });
       if (!byGroup.size) byGroup.set(ds.nation, []);
-      for (const [group, list] of byGroup) out.groups.push({ group, ...FRC.intersections.analyseGroup(geoms, list) });
+      const C = FRC.compute || FRC.intersections;
+      const done = await Promise.all([...byGroup].map(async ([group, list]) => ({ group, ...(await C.analyseGroup(geoms, list)) })));
+      out.groups.push(...done);
     } catch (e) {
       return { ...out, status: "error", statusText: STATUS.error, error: e.message };
     }
@@ -109,8 +111,9 @@
       ? "No mapped polygon from this dataset intersects the site. This does not establish that the site is free from flood risk or that it is in Flood Zone 1."
       : "No mapped polygon from this dataset intersects the site. This does not establish that the site is free from this type of flood risk.");
     if (ds.details) {
-      const hits = anyHit ? FRC.intersections.touching(geoms, fetched.features) : [];
-      ds.details(hits).forEach((n) => { if (n) out.notes.push(n); });
+      const hits = anyHit ? await (FRC.compute || FRC.intersections).touching(geoms, fetched.features) : [];
+      if (hits) ds.details(hits).forEach((n) => { if (n) out.notes.push(n); });
+      else out.notes.push("The names of the features reaching the site could not be listed in time, because the polygons are very detailed.");
     }
     out.groups.forEach((g) => g.overlaps.forEach((o) => out.notes.push(
       `${g.group}: ${FRC.util.fmtNum(o.area, 0)} m² of ${o.label} polygons also lie inside a more severe class. That area is counted once, in the more severe class.`)));

@@ -3,7 +3,7 @@
 Live app: https://andyseremet.github.io/flood-risk-checker/
 Test page: https://andyseremet.github.io/flood-risk-checker/diagnostics.html
 
-This takes about 15 minutes. Check that the footer shows version **2026-11-03.11** or later. If it shows an older version, do a hard refresh (Ctrl+Shift+R, or Cmd+Shift+R on a Mac).
+This takes about 15 minutes. Check that the footer shows version **2026-11-03.12** or later. If it shows an older version, do a hard refresh (Ctrl+Shift+R, or Cmd+Shift+R on a Mac).
 
 ## Part 1. Automatic tests (2 minutes)
 

@@ -116,9 +116,22 @@
     });
     await probe("EA surface water band attribute (York)", () => FRC.ea.surfaceWaterAtPoint(53.9572, -1.0812), (r) => [
       r.band && !/not stated/.test(r.band) ? "Pass" : "Check",
-      [`Band read: ${r.band || "none at this point"}.`, r.raw ? "Properties: " + Object.keys(r.raw).join(", ") : "No feature returned at this point."], { raw: r.raw }]);
+      [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (read as ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
     await probe("EA risk band attribute (York)", () => FRC.ea.riskBand(53.9572, -1.0812), (r) => [
-      r.band && r.band !== "See details" ? "Pass" : "Check", [`Band read: ${r.band || "none at this point"}.`], { raw: r.raw }]);
+      r.band && r.band !== "See details" ? "Pass" : "Check", [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (read as ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
+    // What the two map-image services say they support, in case the point
+    // checks above return nothing.
+    for (const [title, url] of [["EA risk band map service (capabilities)", FRC.config.api.eaRiskWms], ["EA surface water map service (capabilities)", FRC.config.api.eaSurfaceWms]]) {
+      await probe(title, async () => {
+        const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 20000);
+        try { const res = await fetch(`${url}?service=WMS&request=GetCapabilities&version=1.3.0`, { signal: ctrl.signal }); return await res.text(); } finally { clearTimeout(t); }
+      }, (xml) => {
+        const info = (xml.match(/<GetFeatureInfo>([\s\S]*?)<\/GetFeatureInfo>/) || [, ""])[1];
+        const formats = [...info.matchAll(/<Format>([^<]+)<\/Format>/g)].map((m) => m[1]);
+        const layers = [...xml.matchAll(/<Layer([^>]*)>\s*<Name>([^<]+)<\/Name>/g)].map((m) => m[2] + (/queryable="1"/.test(m[1]) ? " (queryable)" : ""));
+        return [layers.length ? "Pass" : "Check", [`Layers: ${layers.join(", ") || "none found"}.`, `Point query formats: ${formats.join(", ") || "none listed"}.`], { layers, formats }];
+      });
+    }
     await probe("EA reservoir extent fields (York)", () => FRC.ea.reservoirInBox(york), (r) => [
       r.features.length ? (keysOf(r.features[0]).includes("reservoir") ? "Pass" : "Check") : "Check",
       [`${r.features.length} extents. Fields: ${keysOf(r.features[0]).join(", ") || "none returned"}.`], { names: r.features.slice(0, 5).map((f) => f.properties && f.properties.reservoir) }]);

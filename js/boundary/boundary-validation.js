@@ -84,7 +84,11 @@
           for (const [ri, ring] of poly.entries()) {
             if (!Array.isArray(ring) || !ring.every(isPos)) { errors.push(where + " has invalid coordinates."); return; }
             const r = cleanRing(ring);
-            if (r.length < 4) { errors.push(`${where}${ri ? " (hole " + ri + ")" : ""} has fewer than 3 distinct corners.`); return; }
+            if (r.length < 4) {
+              // A degenerate hole (common as a sliver in GIS exports) is dropped on its own; the parcel is kept.
+              if (ri > 0) { warnings.push(`${where}: hole ${ri} has fewer than 3 distinct corners and was ignored.`); continue; }
+              errors.push(`${where} has fewer than 3 distinct corners.`); return;
+            }
             rings.push(r);
           }
           if (Math.abs(FRC.measurements.ringSignedArea(rings[0])) === 0) { errors.push(where + " has zero area."); return; }

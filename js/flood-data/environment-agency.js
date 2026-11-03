@@ -9,30 +9,12 @@
   // Reads the attributes of a WMS layer at a point (GetFeatureInfo).
   // Returns the first feature's properties, or null when every attempt
   // answered with no feature. `tried` records each attempt for the test page.
-  function parseInfo(text, format) {
-    const t = text.trim();
-    if (format !== "text/xml" || t.startsWith("{")) {
-      const j = JSON.parse(t);
-      const f = (j.features || j.results || [])[0];
-      if (!f) return { props: null, count: (j.features || j.results || []).length };
-      return { props: f.properties || f.attributes || {}, count: (j.features || j.results).length };
-    }
-    // ArcGIS: <FIELDS a="1" b="2"/>; GeoServer/MapServer GML: <layer_feature><name>v</name>…
-    const fields = t.match(/<FIELDS\s([^>]*)\/?>/i);
-    if (fields) {
-      const props = {};
-      fields[1].replace(/([\w:.-]+)="([^"]*)"/g, (m, k, v) => { props[k] = v; return m; });
-      return { props, count: 1 };
-    }
-    const feat = t.match(/<(\w+:)?\w+_feature>([\s\S]*?)<\/(\w+:)?\w+_feature>/);
-    if (feat) {
-      const props = {};
-      feat[2].replace(/<(?:\w+:)?(\w+)>([^<]*)<\/(?:\w+:)?\1>/g, (m, k, v) => { props[k] = v; return m; });
-      return { props, count: 1 };
-    }
-    if (/ServiceException/i.test(t)) throw new Error("service exception: " + t.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160));
-    return { props: null, count: 0 };
+  function parseInfo(text) {
+    const j = JSON.parse(text);
+    const list = j.features || [];
+    return { props: list[0] ? list[0].properties || {} : null, count: list.length };
   }
+
   // The live service (GeoServer) answered an EPSG:4326 point query with no
   // feature inside Flood Zone 3 at York, while its map images draw correctly
   // in Web Mercator. So the point is asked for first in Web Mercator (the
@@ -62,7 +44,7 @@
           const res = await fetch(url, { signal: ctrl.signal });
           const text = await res.text();
           if (!res.ok) throw new Error("HTTP " + res.status);
-          const r = parseInfo(text, "application/json");
+          const r = parseInfo(text);
           tried.push({ system, features: r.count, ...(r.count ? {} : { sample: text.slice(0, 120) }) });
           if (r.props) return { props: r.props, format: system, tried };
           break;
@@ -153,11 +135,22 @@
       const list = (r.items || []).filter((s) => typeof s.lat === "number")
         .map((s) => ({ id: s.notation || s.stationReference, name: s.label, river: s.riverName || "", lat: s.lat, lon: s.long, km: FRC.util.km(lat, lon, s.lat, s.long) }))
         .sort((a, b) => a.km - b.km).slice(0, 3);
+      // A station can record several measures (level, flow, upstream and
+      // downstream of a weir). Use its river level measure, preferring the
+      // "Stage" (main) one, and show that measure's own unit.
+      const stations = new Map((r.items || []).map((s) => [s.notation || s.stationReference, s]));
       await Promise.all(list.map(async (g) => {
         try {
-          const rr = await FRC.util.getJSON(`${FRC.config.api.eaFlood}/id/stations/${encodeURIComponent(g.id)}/readings?_sorted&_limit=1`);
+          const st = stations.get(g.id) || {};
+          let measures = Array.isArray(st.measures) ? st.measures : st.measures ? [st.measures] : [];
+          if (!measures.length) measures = (await FRC.util.getJSON(`${FRC.config.api.eaFlood}/id/stations/${encodeURIComponent(g.id)}/measures`)).items || [];
+          const levels = measures.filter((m) => m.parameter === "level");
+          const m = levels.find((x) => /stage/i.test(x.qualifier || "")) || levels[0];
+          if (!m || !m["@id"]) return;
+          const id = String(m["@id"]).split("/").pop();
+          const rr = await FRC.util.getJSON(`${FRC.config.api.eaFlood}/id/measures/${encodeURIComponent(id)}/readings?latest`);
           const it = (rr.items || [])[0];
-          if (it) { g.value = it.value; g.time = it.dateTime; }
+          if (it && typeof it.value === "number") { g.value = it.value; g.time = it.dateTime; g.unit = m.unitName || "m"; }
         } catch { /* keep the gauge without a reading */ }
       }));
       return list;

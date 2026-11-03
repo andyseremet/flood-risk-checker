@@ -14,11 +14,23 @@
       return d.result;
     },
 
+    // The nearest postcode gives the place name. Its country is used as the
+    // point's nation only when every postcode within 2 km agrees: near the
+    // England/Wales or England/Scotland border the nearest one can be over
+    // the border, so a mixed answer gives "Unknown" and every agency is asked.
     async reverseLookup(lat, lon) {
       try {
-        const d = await FRC.util.getJSON(`${FRC.config.api.postcode}/postcodes?lon=${lon}&lat=${lat}&limit=1&radius=1000`);
-        return d.result && d.result[0] ? d.result[0] : null;
+        const d = await FRC.util.getJSON(`${FRC.config.api.postcode}/postcodes?lon=${lon}&lat=${lat}&limit=10&radius=2000`);
+        const list = (d.result || []).filter(Boolean);
+        if (!list.length) return null;
+        const countries = [...new Set(list.map((r) => r.country).filter(Boolean))];
+        return { ...list[0], nation: countries.length === 1 ? countries[0] : "Unknown", nearBorder: countries.length > 1 };
       } catch { return null; }
+    },
+
+    nationOf(place) {
+      if (!place) return "Unknown";
+      return place.nation || place.country || "Unknown";
     },
   };
 })(typeof window !== "undefined" ? window : globalThis);

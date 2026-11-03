@@ -6,8 +6,10 @@
   const { $, esc } = FRC.util;
 
   const state = {
-    current: null,      // last completed flood check
+    current: null,      // last completed point check (postcode search or map click)
     checkSequence: 0,   // stops a slow, older check overwriting a newer one
+    siteCheck: null,    // point check at the current site's centroid
+    siteCheckSeq: 0,
     site: { features: [], measured: null, warnings: [], errors: [] },
     importNotes: [],    // messages from the last import, kept until the site is cleared
     analysis: null,     // last site-wide flood-zone analysis (cleared when the site changes)
@@ -15,6 +17,7 @@
     analysing: false,
     analysisError: null,
     logo: null,         // company logo for the PDF, as a data URL
+    building: false,    // a PDF is being built: map clicks wait, the button stays off
   };
 
   // Company name and logo are remembered in this browser only. Storage can be
@@ -30,17 +33,24 @@
   }
   FRC.state = state;
 
+  // The point check the results and report describe: with a site, the check
+  // at that site's centroid; without one, the last postcode search or map
+  // click. A click elsewhere is never mixed into a site's report.
+  const reportCheck = () => (state.site.features.length ? state.siteCheck : state.current);
+
   // ---------- Results dashboard ----------
   function renderDashboard() {
     const show = state.site.features.length > 0 || Boolean(state.current);
     $("dashCard").hidden = !show;
     FRC.results.renderDashboard($("dashboard"), {
-      site: state.site, current: state.current, analysis: state.analysis,
+      site: state.site, current: reportCheck(), analysis: state.analysis,
       siteName: $("siteName").value.trim(), analysing: state.analysing, analysisError: state.analysisError,
     });
   }
 
   // ---------- Site boundary ----------
+  let centroidTimer = null;
+  const pdfReady = () => !state.building && (state.site.features.length > 0 || Boolean(state.current));
   function recomputeSite() {
     const raw = FRC.boundaryDraw.getFeatures();
     const v = FRC.boundaryValidation.validate({ type: "FeatureCollection", features: raw }, "The site boundary");
@@ -51,6 +61,15 @@
         `${site.measured.parcels[o.i].name} and ${site.measured.parcels[o.j].name} overlap by ${FRC.util.fmtNum(o.area, 0)} m². The site area counts that overlap twice.`));
     }
     state.site = site;
+    // A point check from somewhere else no longer describes this site, and a
+    // check at the old centroid is out of date. The report and dashboard must
+    // not mix them with the new boundary, so the centroid is checked again.
+    state.siteCheck = null; state.siteCheckSeq++;
+    clearTimeout(centroidTimer);
+    if (v.features.length) centroidTimer = setTimeout(() => {
+      const c = state.site.measured && state.site.measured.centroidWGS;
+      if (c && !state.analysing) runCheck({ lat: c[1], lon: c[0], fromSite: true });
+    }, 800);
     // Any change to the boundary makes the previous analysis out of date.
     state.analysisSeq++;
     state.analysis = null;
@@ -63,7 +82,7 @@
     $("exportBtn").disabled = !has;
     $("clearBtn").disabled = !has;
     $("siteCheckBtn").disabled = !has;
-    $("pdfBtn").disabled = !(has || state.current);
+    $("pdfBtn").disabled = !pdfReady();
   }
 
   function onSiteChange(kind) {
@@ -91,21 +110,24 @@
   }
 
   // ---------- Flood checks ----------
+  // Returns the check's result, or null if a newer check replaced it.
   async function runCheck({ lat, lon, place, fromSite = false }) {
-    const requestId = ++state.checkSequence;
+    const seqKey = fromSite ? "siteCheckSeq" : "checkSequence";
+    const requestId = ++state[seqKey];
+    const stale = () => requestId !== state[seqKey];
     const dist = Number($("radius").value);
-    state.current = null;
-    $("pdfBtn").disabled = !state.site.features.length;
+    if (fromSite) state.siteCheck = null; else state.current = null;
+    $("pdfBtn").disabled = !pdfReady();
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
       $("status").textContent = "The selected coordinates are invalid. Please choose another location.";
-      return;
+      return null;
     }
     $("status").textContent = "Checking flood data…";
     FRC.map.showPoint(lat, lon, dist, { fit: !fromSite });
 
     if (!place) place = await FRC.location.reverseLookup(lat, lon);
-    if (requestId !== state.checkSequence) return;
-    const nation = (place && place.country) || "Unknown";
+    if (stale()) return null;
+    const nation = FRC.location.nationOf(place);
     const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {} };
 
     const isEng = nation === "England", isWal = nation === "Wales", isSco = nation === "Scotland", unknown = nation === "Unknown";
@@ -120,13 +142,14 @@
     }
     await Promise.all(tasks);
     // A later map click or postcode search takes precedence over this response.
-    if (requestId !== state.checkSequence) return;
+    if (stale()) return res;
 
     FRC.map.showGauges(res.gauges);
-    state.current = res;
+    if (fromSite) state.siteCheck = res; else state.current = res;
     renderDashboard();
-    $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.`;
-    $("pdfBtn").disabled = false;
+    $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.` + (state.site.features.length && !fromSite ? " The results and report cover the drawn site, not this point. Clear the site to report on this point." : "");
+    $("pdfBtn").disabled = !pdfReady();
+    return res;
   }
 
   // Point checks at the centroid, then the site-wide flood-zone intersection.
@@ -140,8 +163,10 @@
     renderDashboard();
     $("siteCheckBtn").disabled = true;
     try {
-      await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
-      const nation = state.current ? state.current.nation : "Unknown";
+      // The nation comes from this check's own result, so a map click made
+      // while it runs cannot change which country's data the site is checked against.
+      const res = await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
+      const nation = res ? res.nation : FRC.location.nationOf(await FRC.location.reverseLookup(m.centroidWGS[1], m.centroidWGS[0]));
       const a = await FRC.floodAnalysis.analyseSite(features, nation);
       if (seq !== state.analysisSeq) return; // the boundary changed while we waited
       state.analysis = a;
@@ -203,8 +228,10 @@
 
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); searchPostcode($("postcode").value); });
     document.querySelectorAll("[data-pc]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); $("postcode").value = a.dataset.pc; searchPostcode(a.dataset.pc); }));
-    map.on("click", (e) => { if (!FRC.boundaryDraw.isBusy()) runCheck({ lat: e.latlng.lat, lon: e.latlng.lng }); });
-    $("radius").addEventListener("change", () => { const c = state.current; if (c) runCheck({ lat: c.lat, lon: c.lon, place: c.place, fromSite: c.fromSite }); });
+    map.on("click", (e) => { if (!FRC.boundaryDraw.isBusy() && !state.building) runCheck({ lat: e.latlng.lat, lon: e.latlng.lng }); });
+    $("radius").addEventListener("change", () => {
+      [state.current, state.siteCheck].forEach((c) => { if (c) runCheck({ lat: c.lat, lon: c.lon, place: c.place, fromSite: c.fromSite }); });
+    });
 
     $("drawBtn").addEventListener("click", () => FRC.boundaryDraw.startPolygon());
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());
@@ -220,15 +247,17 @@
     });
 
     $("pdfBtn").addEventListener("click", async () => {
-      const btn = $("pdfBtn"); btn.disabled = true; btn.textContent = "Building PDF…";
+      const btn = $("pdfBtn");
+      if (state.building) return;
+      state.building = true; btn.disabled = true; btn.textContent = "Building PDF…";
       try {
-        await FRC.pdfReport.build(state.current, state.site, state.analysis, {
+        await FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
           company: $("company").value.trim(), logo: state.logo,
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), notes: $("notes").value.trim(),
           sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         });
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
-      btn.disabled = false; btn.textContent = "Download PDF report";
+      state.building = false; btn.disabled = !pdfReady(); btn.textContent = "Download PDF report";
     });
     $("checkBtn").addEventListener("click", testConnections);
 

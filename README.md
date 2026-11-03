@@ -112,17 +112,17 @@ Leaflet 1.9.4, Leaflet.draw 1.0.4, Turf 6.5.0 (validation and overlap checks), P
 
 ## Releasing a change
 
-The page loads its scripts and styles with a version tag (`?v=2026-11-03.15`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
+The page loads its scripts and styles with a version tag (`?v=1.0.0`), which is also shown in the page footer. Change it in `index.html` and `diagnostics.html` with each release (including the `FRC_VERSION` line, which the background worker uses) so browsers fetch the new files instead of a cached copy:
 
 ```bash
-sed -i 's/2026-11-03\.11/NEW/g' index.html diagnostics.html
+sed -i 's/1\.0\.0/NEW/g' index.html diagnostics.html
 ```
 
 The polygon measurements run in a background worker (`js/analysis/analysis-worker.js`, started by `js/analysis/compute.js`) so detailed flood polygons cannot freeze the page. Exact clipping gets 15 seconds; if it runs over, the areas are estimated from sample points (30 seconds); if that also runs over, the dataset shows a processing error. Opened as a local file, the browser blocks workers and the measurements run on the page instead.
 
 ## Tests
 
-**In the browser, against the live services:** open `diagnostics.html` (linked from the Data connections card) and press **Run all tests**. It runs the spec's phase 9 cases: service connections, what the live data contains (including the Wales zone field and the surface water band field), analysis of seven real sites (several classes, outside all zones, a large complex site, two parcels, a hole, Wales, Scotland), the GeoJSON, KML and Shapefile fixtures, export round trip, and an unreachable service and a timeout. It ends with a report to copy.
+**In the browser, against the live services:** open `diagnostics.html` (linked from the Data connections card) and press **Run all tests**. Use it when a service seems to have changed. It runs the spec's phase 9 cases: service connections, what the live data contains (including the Wales zone field and the surface water band field), analysis of seven real sites (several classes, outside all zones, a large complex site, two parcels, a hole, Wales, Scotland), the GeoJSON, KML and Shapefile fixtures, export round trip, and an unreachable service and a timeout. It ends with a report to copy.
 
 **In Node, with fixed data:**
 
@@ -136,14 +136,15 @@ The tests measure boundaries with known areas (a 100 m square in BNG, a square w
 
 ## Known limitations
 
-- The long-term risk band, surface water, live warnings and gauges are still point checks at the site centroid.
-- Surface water, reservoir and historic flooding are not yet added for Wales (NRW).
-- The site's nation comes from its centroid. A site that crosses the England/Wales or England/Scotland border is analysed only against the centroid's agency.
-- The NRW layer's zone field has not been confirmed against live data. Polygons whose zone can't be read are shown as "zone not stated".
+- The long-term risk band, surface water, live warnings and gauges are point checks at the site centroid. In live testing the Environment Agency's risk band service answered point queries with no band, even inside Flood Zone 3, so treat an empty risk band as "not available" and use the map layer instead.
+- Surface water, reservoir and historic flooding are not added for Wales (NRW).
+- The site's nation comes from its centroid. Near the England/Wales or England/Scotland border, where nearby postcodes are in different countries, the nation is "Unknown" and every agency is queried. A site that crosses a border is otherwise analysed only against its centroid's agency.
+- If SEPA refuses one of its nine layers, the other layers are kept and the result is marked Partial coverage, naming the missing layer.
 - Very large sites can hit a service's result limit. This is reported as Partial coverage.
-- Address search is not supported yet, only postcodes.
+- Address search is not supported, only postcodes.
 - The BNG conversion uses a standard 7-parameter shift, accurate to a few metres. Grid areas can differ from ground areas by up to about 0.1%.
 - If a dataset's polygons are too complex for exact clipping, its areas are estimated from about 10,000 sample points (roughly 1 to 2% error), marked "areas estimated", and not shaded on the map.
+- Changing the boundary during an analysis discards the old result, but its downloads finish in the background.
 - KMZ files are not supported. Save as KML instead.
 
 ## Licence and credits

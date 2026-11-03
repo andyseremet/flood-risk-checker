@@ -121,4 +121,15 @@ test("Overlapping parcels are reported", () => {
   near(o[0].area, 37500, 2, "overlap m²");
 });
 
+test("A degenerate sliver hole is dropped with a warning; the parcel is kept", () => {
+  const P = FRC.projections, e = 430000, n = 430000;
+  const outer = [[e, n], [e + 100, n], [e + 100, n + 100], [e, n + 100], [e, n]];
+  const hole = [[e + 10, n + 10], [e + 20, n + 20], [e + 10, n + 10]];
+  const g = P.geometryToWGS84({ type: "Polygon", coordinates: [outer, hole] });
+  const { v, m } = measure({ type: "Feature", properties: {}, geometry: g });
+  assert.strictEqual(v.features.length, 1, "parcel kept");
+  near(m.area, 10000, 1, "area m²");
+  assert.ok(v.warnings.some((w) => /hole 1/.test(w)), "warning names the hole");
+});
+
 console.log(`\n${passed} tests passed`);

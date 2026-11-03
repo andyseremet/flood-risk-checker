@@ -4,6 +4,8 @@
   const FRC = (root.FRC = root.FRC || {});
 
   let map = null, marker = null, radiusCircle = null, gaugeLayer = null, analysisLayer = null;
+  let snapQueue = Promise.resolve();
+  const takeSnapshot = (opts) => FRC.map._snapshot(opts);
 
   // Resolves when every tile layer on the map has finished loading, or after
   // the timeout so a slow or blocked service cannot stall the report.
@@ -60,7 +62,15 @@
     // then put the view and layers back as they were.
     // view: { bounds } or { center: [lat, lon], zoom }. overlays: keys of
     // FRC.mapLayers.layers to show (others hidden). analysis: show shading.
-    async snapshot({ view, overlays = [], analysis = false, width = 900, height = 600 }) {
+    // Snapshots take turns: each one changes the map's size and layers and
+    // puts them back, so two at once would restore each other's temporary state.
+    snapshot(opts) {
+      const run = snapQueue.then(() => takeSnapshot(opts));
+      snapQueue = run.catch(() => {});
+      return run;
+    },
+
+    async _snapshot({ view, overlays = [], analysis = false, width = 900, height = 600 }) {
       const el = map.getContainer();
       const layers = (FRC.mapLayers && FRC.mapLayers.layers) || {};
       const wasOn = Object.fromEntries(Object.entries(layers).map(([k, l]) => [k, map.hasLayer(l)]));

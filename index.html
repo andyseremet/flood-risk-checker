@@ -8,50 +8,50 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.1.1">
+<link rel="stylesheet" href="assets/css/style.css?v=1.2.0">
 </head>
 <body>
+<div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+  <div class="progress-track"><div class="progress-fill"></div></div>
+  <span class="progress-label">Working…</span>
+</div>
 <header>
   <h1>Flood Risk Checker</h1>
   <p>Professional Edition (in development) · Preliminary site screening for England, Wales and Scotland · PDF report</p>
 </header>
 <main>
   <div id="side">
-    <section class="card" aria-labelledby="h-search">
-      <h2 id="h-search">1. Find the location</h2>
-      <form class="search" id="searchForm" novalidate>
-        <input id="postcode" type="text" placeholder="Postcode, e.g. YO1 7HH" autocomplete="postal-code" aria-label="Postcode">
-        <button type="submit" id="searchBtn">Check</button>
-      </form>
-      <p class="hint">Or click anywhere on the map. Examples: <a href="#" data-pc="YO1 7HH">York</a>, <a href="#" data-pc="PH2 8AA">Perth</a>, <a href="#" data-pc="SA1 1NW">Swansea</a>.</p>
-      <p class="hint" id="status" role="status"></p>
-    </section>
-
+    <ol class="steps" aria-label="How it works">
+      <li><strong>Pick a place</strong><span>Search a postcode or click the map</span></li>
+      <li><strong>Check</strong><span>Press Check under the map</span></li>
+      <li><strong>Report</strong><span>Download the PDF</span></li>
+    </ol>
     <section class="card" aria-labelledby="h-site">
-      <h2 id="h-site">2. Site boundary</h2>
+      <h2 id="h-site">1. Site <button type="button" class="info" aria-expanded="false" aria-controls="help-site" title="The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid." aria-label="How the site works">i</button></h2>
+      <p class="help" id="help-site" hidden>The site is the area that gets checked. With only a pin, it is the 600 m circle around the pin. Draw or import your own boundary for an exact check: it replaces the circle. Area, perimeter and centre are measured on the British National Grid.</p>
+      <p class="hint">Try: <a href="#" data-pc="YO1 7HH">York</a> · <a href="#" data-pc="PH2 8AA">Perth</a> · <a href="#" data-pc="SA1 1NW">Swansea</a></p>
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Site name</span><input type="text" id="siteName" placeholder="e.g. Land north of Station Road"></label>
-      <div class="row">
-        <button type="button" id="drawBtn">Draw boundary</button>
-        <label class="filebtn">Import file<input type="file" id="importInput" accept=".geojson,.json,.kml,.zip,application/geo+json,application/vnd.google-earth.kml+xml,application/zip"></label>
-      </div>
-      <p class="hint">Draw on the map (click each corner, then click the first corner to finish), or import GeoJSON, KML or a zipped Shapefile. Use the map's edit and delete tools to change parcels. You can add several parcels.</p>
       <p class="hint" id="importMsg" role="status"></p>
       <div id="siteInfo"></div>
-      <div class="row">
-        <button type="button" id="siteCheckBtn" disabled>Analyse site</button>
-        <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
-        <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
-      </div>
     </section>
 
     <section class="card" aria-labelledby="h-dash" id="dashCard" hidden>
-      <h2 id="h-dash">3. Results</h2>
+      <h2 id="h-dash">2. Results <button type="button" class="info" aria-expanded="false" aria-controls="help-dash" title="The summary comes first: a rating for each source of flooding and whether a full Flood Risk Assessment is likely to be needed. Sections A to E give the detail. &quot;None mapped&quot; means no mapped feature was found. It does not mean the site is safe." aria-label="How the results works">i</button></h2>
+      <p class="help" id="help-dash" hidden>The summary comes first: a rating for each source of flooding and whether a full Flood Risk Assessment is likely to be needed. Sections A to E give the detail. "None mapped" means no mapped feature was found. It does not mean the site is safe.</p>
       <div id="dashboard" class="dashboard"></div>
     </section>
 
     <section class="card" aria-labelledby="h-report">
-      <h2 id="h-report">4. Report</h2>
-      <p class="hint">The executive summary and the data sources, methodology and limitations are always included.</p>
+      <h2 id="h-report">3. Report options <button type="button" class="info" aria-expanded="false" aria-controls="help-report" title="Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges." aria-label="How the report works">i</button></h2>
+      <p class="help" id="help-report" hidden>Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges.</p>
+      <div class="grid2">
+        <label>Prepared by<input type="text" id="analyst"></label>
+        <label>Checked by<input type="text" id="checkedBy" placeholder="Second person"></label>
+      </div>
+      <details class="more">
+        <summary>More options</summary>
+        <div class="more-body">
+      <p class="hint">Sections to include. The summary and the data sources, method and limitations are always included.</p>
       <label class="opt"><input type="checkbox" id="o-location" checked> 2. Site location plan</label>
       <label class="opt"><input type="checkbox" id="o-site" checked> 3. Site boundary and measurements</label>
       <label class="opt"><input type="checkbox" id="o-zone" checked> 4. Flood-zone assessment</label>
@@ -73,29 +73,48 @@
           <input type="text" id="ref" placeholder="e.g. FR-0142">
         </label>
       </div>
-      <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Prepared by</span><input type="text" id="analyst"></label>
-      <div class="grid2">
-        <label>Checked by<input type="text" id="checkedBy" placeholder="Second person"></label>
-        <label>Report version<input type="text" id="version" value="1" placeholder="e.g. 1 or A"></label>
-      </div>
+      <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Report version</span><input type="text" id="version" value="1" placeholder="e.g. 1 or A"></label>
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Notes (printed on page one)</span><textarea id="notes"></textarea></label>
-      <div class="row"><button type="button" id="pdfBtn" disabled>Download PDF report</button></div>
+        </div>
+      </details>
     </section>
 
-    <section class="card" aria-labelledby="h-checks">
-      <h2 id="h-checks">Data connections</h2>
+    <details class="card more-card">
+      <summary>Data connections</summary>
+    <section aria-labelledby="h-checks" class="card-inner">
+      <h2 id="h-checks" class="sr-only-h">Service status <button type="button" class="info" aria-expanded="false" aria-controls="help-checks" title="Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it." aria-label="How the connection test works">i</button></h2>
+      <p class="help" id="help-checks" hidden>Tests whether this browser can reach each free public data service. Blocked usually means a network, firewall or browser setting is stopping it.</p>
       <p class="hint">Shows whether this browser can reach each public service.</p>
       <ul class="checks" id="checks"></ul>
       <div class="row"><button type="button" class="ghost" id="checkBtn">Test connections</button></div>
     </section>
+    </details>
 
-    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.1.1.</span></footer>
+    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.2.0.</span></footer>
   </div>
   <div id="mapwrap">
+   <div id="mapbox">
     <div id="map" aria-label="Map"></div>
-    <button type="button" class="layers-toggle" id="layersToggle" aria-controls="legend" aria-expanded="false" title="Map layers" aria-label="Show map layers">
+    <div class="map-tools">
+      <form class="map-search" id="searchForm" novalidate role="search">
+        <button type="button" class="map-btn" id="searchToggle" aria-controls="searchPanel" aria-expanded="false" title="Search a postcode" aria-label="Search a postcode">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <span class="search-panel" id="searchPanel" hidden>
+          <input id="postcode" type="text" placeholder="Postcode, e.g. YO1 7HH" autocomplete="postal-code" aria-label="Postcode">
+          <button type="submit" id="searchBtn">Go</button>
+        </span>
+      </form>
+      <label class="map-btn" title="Import a boundary file (GeoJSON, KML or zipped Shapefile)">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <input type="file" id="importInput" aria-label="Import a boundary file" accept=".geojson,.json,.kml,.zip,application/geo+json,application/vnd.google-earth.kml+xml,application/zip">
+      </label>
+      <button type="button" class="map-btn info-btn" aria-expanded="false" aria-controls="help-map" title="On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site." aria-label="How the map works">i</button>
+      <button type="button" class="map-btn layers-toggle" id="layersToggle" aria-controls="legend" aria-expanded="false" title="Map layers" aria-label="Show map layers">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3 2 8.5l10 5.5 10-5.5L12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m2 12.5 10 5.5 10-5.5M2 16.5 12 22l10-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-    </button>
+      </button>
+    </div>
+    <p class="help map-help" id="help-map" hidden>On the map: the magnifier searches a postcode, the folder imports a boundary file, and the stacked squares show flood map layers. The tools at the top left draw a polygon or rectangle, and edit or delete parcels. Zoom is at the bottom left. Click the map to drop a pin: the 600 m area around it becomes the site.</p>
     <div class="legend" id="legend" hidden>
       <div class="legend-head"><strong>Map layers</strong><button type="button" class="link" id="layersClose" aria-label="Hide map layers">Close</button></div>
       <span><span class="site-swatch"></span>Site boundary</span>
@@ -110,6 +129,18 @@
       <label><input type="checkbox" id="l-w" checked> Flood zones (Wales)</label>
       <label><input type="checkbox" id="l-s" checked> River flooding (Scotland, shows when zoomed in close)</label>
     </div>
+   </div>
+    <div class="mapbar">
+      <div class="row">
+        <button type="button" id="siteCheckBtn" disabled>Check</button>
+        <button type="button" id="pdfBtn" disabled>Download PDF report</button>
+        <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
+        <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
+        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
+      </div>
+      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
+      <p class="hint" id="status" role="status"></p>
+    </div>
   </div>
 </main>
 
@@ -122,28 +153,29 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.1.1";</script>
-<script src="js/config.js?v=1.1.1"></script>
-<script src="js/util.js?v=1.1.1"></script>
-<script src="js/geometry/projections.js?v=1.1.1"></script>
-<script src="js/geometry/measurements.js?v=1.1.1"></script>
-<script src="js/boundary/boundary-validation.js?v=1.1.1"></script>
-<script src="js/boundary/boundary-import.js?v=1.1.1"></script>
-<script src="js/boundary/boundary-export.js?v=1.1.1"></script>
-<script src="js/map/map.js?v=1.1.1"></script>
-<script src="js/map/map-layers.js?v=1.1.1"></script>
-<script src="js/boundary/boundary-draw.js?v=1.1.1"></script>
-<script src="js/location/location-search.js?v=1.1.1"></script>
-<script src="js/flood-data/environment-agency.js?v=1.1.1"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.1.1"></script>
-<script src="js/flood-data/sepa.js?v=1.1.1"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.1.1"></script>
-<script src="js/analysis/intersections.js?v=1.1.1"></script>
-<script src="js/analysis/compute.js?v=1.1.1"></script>
-<script src="js/analysis/flood-analysis.js?v=1.1.1"></script>
-<script src="js/dashboard/results.js?v=1.1.1"></script>
-<script src="js/reporting/assessment.js?v=1.1.1"></script>
-<script src="js/reporting/pdf-report.js?v=1.1.1"></script>
-<script src="js/app.js?v=1.1.1"></script>
+<script>window.FRC_VERSION = "1.2.0";</script>
+<script src="js/config.js?v=1.2.0"></script>
+<script src="js/util.js?v=1.2.0"></script>
+<script src="js/progress.js?v=1.2.0"></script>
+<script src="js/geometry/projections.js?v=1.2.0"></script>
+<script src="js/geometry/measurements.js?v=1.2.0"></script>
+<script src="js/boundary/boundary-validation.js?v=1.2.0"></script>
+<script src="js/boundary/boundary-import.js?v=1.2.0"></script>
+<script src="js/boundary/boundary-export.js?v=1.2.0"></script>
+<script src="js/map/map.js?v=1.2.0"></script>
+<script src="js/map/map-layers.js?v=1.2.0"></script>
+<script src="js/boundary/boundary-draw.js?v=1.2.0"></script>
+<script src="js/location/location-search.js?v=1.2.0"></script>
+<script src="js/flood-data/environment-agency.js?v=1.2.0"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.2.0"></script>
+<script src="js/flood-data/sepa.js?v=1.2.0"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.2.0"></script>
+<script src="js/analysis/intersections.js?v=1.2.0"></script>
+<script src="js/analysis/compute.js?v=1.2.0"></script>
+<script src="js/analysis/flood-analysis.js?v=1.2.0"></script>
+<script src="js/dashboard/results.js?v=1.2.0"></script>
+<script src="js/reporting/assessment.js?v=1.2.0"></script>
+<script src="js/reporting/pdf-report.js?v=1.2.0"></script>
+<script src="js/app.js?v=1.2.0"></script>
 </body>
 </html>

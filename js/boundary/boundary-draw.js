@@ -39,7 +39,8 @@
 
       const E = L.Draw.Event;
       map.on(E.CREATED, (e) => { addPolygonLayer(e.layer); onChange("drawn"); });
-      map.on(E.EDITED, () => onChange("edited"));
+      // An edited pin area is now the user's own boundary.
+      map.on(E.EDITED, (e) => { e.layers.eachLayer((l) => { delete l._frcAuto; }); onChange("edited"); });
       map.on(E.DELETED, () => onChange("deleted"));
       // While drawing or editing, map clicks must not run a location check.
       [E.DRAWSTART, E.EDITSTART, E.DELETESTART].forEach((ev) => map.on(ev, () => { busy = true; }));
@@ -49,11 +50,9 @@
 
     isBusy: () => busy,
 
-    // Start drawing a new polygon from an outside button.
-    startPolygon() { new L.Draw.Polygon(map, { allowIntersection: false, showArea: false, shapeOptions: STYLE }).enable(); },
-
     // Add validated WGS84 features. MultiPolygons are split so each part can be edited.
-    addFeatures(features) {
+    // auto: the area around a dropped pin, replaced when the user adds their own boundary.
+    addFeatures(features, { auto = false } = {}) {
       const added = [];
       features.forEach((f) => {
         const base = (f.properties && f.properties.name) || null;
@@ -61,6 +60,7 @@
         polys.forEach((coords, i) => {
           const latlngs = coords.map((ring) => ring.slice(0, -1).map(([lon, lat]) => [lat, lon]));
           const layer = L.polygon(latlngs, STYLE);
+          if (auto) layer._frcAuto = true;
           addPolygonLayer(layer, base ? (polys.length > 1 ? `${base} (part ${i + 1})` : base) : null);
           added.push(layer);
         });
@@ -79,6 +79,11 @@
     },
 
     layers: () => group.getLayers(),
+    // True when the only parcel is the area around a dropped pin.
+    isAuto: () => group.getLayers().length > 0 && group.getLayers().every((l) => l._frcAuto),
+    hasOwn: () => group.getLayers().some((l) => !l._frcAuto),
+    // Remove the pin area without reporting a change (a change follows).
+    removeAuto() { group.getLayers().filter((l) => l._frcAuto).forEach((l) => group.removeLayer(l)); },
     removeLayer(layer) { group.removeLayer(layer); onChange("deleted"); },
     renameLayer(layer, name) { layer._frcName = name; onChange("renamed"); },
     clear() { group.clearLayers(); counter = 0; onChange("cleared"); },

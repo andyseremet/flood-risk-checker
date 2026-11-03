@@ -3,7 +3,7 @@
   "use strict";
   const FRC = (root.FRC = root.FRC || {});
 
-  let map = null, marker = null, radiusCircle = null, gaugeLayer = null, analysisLayer = null;
+  let map = null, marker = null, gaugeLayer = null, analysisLayer = null;
   let snapQueue = Promise.resolve();
   let snapping = false, lastCentre = null;
   // Remembers the middle of the map after each move, so a resize can put it back.
@@ -69,7 +69,8 @@
 
   FRC.map = {
     init(elementId) {
-      map = L.map(elementId, { zoomControl: true }).setView([54.3, -2.5], 6);
+      map = L.map(elementId, { zoomControl: false }).setView([54.3, -2.5], 6);
+      L.control.zoom({ position: "bottomleft" }).addTo(map);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19, crossOrigin: true, attribution: "© OpenStreetMap contributors",
       }).addTo(map);
@@ -86,14 +87,12 @@
     centre() { if (marker) map.setView(marker.getLatLng(), map.getZoom()); },
     get() { return map; },
 
-    // Show the checked location and the search radius.
+    // Show the checked location. (The 600 m site area around a dropped pin
+    // is drawn as a site parcel, so no separate radius circle is shown.)
     showPoint(lat, lon, distKm, { fit = true } = {}) {
       if (marker) marker.remove();
-      if (radiusCircle) radiusCircle.remove();
       gaugeLayer.clearLayers();
-      marker = L.marker([lat, lon], { title: "Checked location" }).addTo(map);
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#0b6e8a";
-      radiusCircle = L.circle([lat, lon], { radius: distKm * 1000, color: accent, weight: 1, fillOpacity: 0.04, interactive: false }).addTo(map);
+      marker = L.marker([lat, lon], { title: "Checked location", interactive: false }).addTo(map);
       if (fit) map.setView([lat, lon], distKm >= 5 ? 12 : 14);
     },
 

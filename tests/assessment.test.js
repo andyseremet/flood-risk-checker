@@ -57,6 +57,12 @@ test("England site of 1 ha or more in Zone 1: FRA likely because of size", () =>
   assert.ok(f.reasons.some((t) => /1\.20 ha/.test(t)));
 });
 
+test("Pin area (600 m circle): no 1 ha trigger, and the user is told to add the real boundary", () => {
+  const f = A.fraNeed({ analysis: england([]), site: { auto: true, features: [{}], measured: { hectares: 113 } }, nation: "England" });
+  assert.strictEqual(f.verdict, "notTriggered");
+  assert.ok(f.actions.some((t) => /600 m area around the pin/.test(t)));
+});
+
 test("England surface water band at the centroid: FRA may be needed", () => {
   const a = england([], { sw: "Low" });
   const rows = A.riskBySource({ analysis: a, nation: "England" });

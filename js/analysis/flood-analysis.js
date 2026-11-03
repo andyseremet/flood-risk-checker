@@ -135,10 +135,12 @@
       const centroid = FRC.measurements.measureSite(features).centroidWGS;
       const wanted = DATASETS.filter((d) => d.kind !== "none" && (nation === "Unknown" || d.nation === nation));
       const notAssessed = (d, reason) => Promise.resolve({ id: d.id, nation: d.nation, name: d.name, status: "notAssessed", statusText: STATUS.notAssessed, groups: [], notes: [reason] });
+      const P = FRC.progress;
       const results = await Promise.all(DATASETS.map((d) => {
         if (d.kind === "none") return notAssessed(d, d.reason);
         if (!wanted.includes(d)) return notAssessed(d, `The site centroid is not in ${d.nation}.`);
-        return d.kind === "point" ? runPointDataset(d, centroid) : runDataset(d, geoms, box);
+        const job = d.kind === "point" ? runPointDataset(d, centroid) : runDataset(d, geoms, box);
+        return P ? P.track(job, "Measuring flood data across the site…") : job;
       }));
       const notes = [];
       if (nation === "Northern Ireland") notes.push("Northern Ireland flood map data is not open, so the site cannot be analysed.");

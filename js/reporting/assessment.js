@@ -154,13 +154,13 @@
       if (lvl("Rivers and sea", 2)) likely.push(nation === "Wales"
         ? "Part of the site is in Flood Zone 2 or 3 on the Flood Map for Planning. TAN15 asks for a Flood Consequences Assessment there."
         : "Part of the site is in Flood Zone 2 or 3. GOV.UK requires a site-specific FRA for development in these zones.");
-      if (nation !== "Wales" && hectares != null && hectares >= 1) likely.push(`The site is ${hectares.toFixed(2)} ha. In England an FRA is required for any site of 1 ha or more, even in Flood Zone 1.`);
+      if (nation !== "Wales" && hectares != null && hectares >= 1 && !(site && site.auto)) likely.push(`The site is ${hectares.toFixed(2)} ha. In England an FRA is required for any site of 1 ha or more, even in Flood Zone 1.`);
       if (lvl("Surface water", 1)) possible.push("A surface water risk band is mapped at the site centroid. In England an FRA is also needed in Flood Zone 1 where a site is affected by other sources, such as surface water.");
       if (lvl("Reservoirs", 1)) possible.push("Part of the site is in a reservoir flood extent, which counts as another source of flooding.");
       if (lvl("Historic flooding", 1)) possible.push("Part of the site has flooded before (recorded flood outline).");
     }
     rows.filter((x) => x.rating === "No result" && /Rivers|Sea/.test(x.source)).forEach((x) => unclear.push(`${x.source}: ${x.evidence}`));
-    if (!analysis && site && site.features && site.features.length) unclear.push("The site-wide analysis was not run, so only the centroid was checked.");
+    if (!analysis && site && site.features && site.features.length && !site.auto) unclear.push("The site-wide analysis was not run, so only the centroid was checked.");
     if (rows.some((x) => /Partial data/.test(x.evidence || ""))) unclear.push("Some data was only partly returned.");
 
     let verdict, headline;
@@ -170,6 +170,7 @@
     else { verdict = "notTriggered"; headline = "The checks made here did not trigger a full assessment."; }
 
     const actions = [];
+    if (site && site.auto) actions.push("This check used the 600 m area around the pin, not a site boundary. Draw or import the real site boundary for an exact answer, including the 1 ha size rule.");
     if (verdict === "likely" || verdict === "possible") actions.push(`Commission a ${name} from a competent professional before applying for planning permission.`);
     if (nation === "England" || nation === "Unknown") {
       if (verdict === "likely") actions.push("Request detailed flood data (Product 4) from the Environment Agency; it aims to reply within 20 working days.");

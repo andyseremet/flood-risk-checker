@@ -51,6 +51,16 @@
       render();
     },
 
+    // A message (not a problem): kept in the Log so the map area stays clean.
+    // The same message twice in a row is kept once.
+    info(message) {
+      const last = entries[0];
+      if (last && last.info && last.message === message) { last.at = new Date(); render(); return; }
+      entries.unshift({ key: "info:" + Date.now(), what: message, message: "", url: null, at: new Date(), tries: 0, fixed: null, once: true, info: true });
+      if (entries.length > 200) entries.length = 200;
+      render();
+    },
+
     // A one-off problem that Try again cannot fix (for example a postcode lookup).
     note(what, message, url) {
       entries.unshift({ key: "once:" + Date.now(), what, message: message || "", url: url || null, at: new Date(), tries: 0, fixed: null, once: true });
@@ -66,6 +76,7 @@
       lines.push("");
       if (!entries.length) lines.push("No errors.");
       entries.slice().reverse().forEach((e) => {
+        if (e.info) { lines.push(`${hhmmss(e.at)}  (message) ${e.what}`); return; }
         lines.push(`${hhmmss(e.at)}  ${e.what}`);
         if (e.message) lines.push(`  Message: ${e.message}`);
         const h = hint(e.message); if (h) lines.push(`  Hint: ${h}`);
@@ -78,17 +89,16 @@
   };
 
   function render() {
-    const wrap = $("errLog");
-    if (!wrap) return;
+    if (!$("errLogToggle")) return;
     const open = entries.filter((e) => !e.fixed && !e.once).length;
-    const oneOff = entries.filter((e) => e.once).length;
-    wrap.hidden = entries.length === 0;
-    const btn = $("errLogToggle");
-    const n = open + oneOff;
-    btn.textContent = n ? `${n} problem${n === 1 ? "" : "s"}` : "Error log";
-    btn.classList.toggle("bad", open > 0);
+    const oneOff = entries.filter((e) => e.once && !e.info).length;
+    // The Log button shows a red badge with the number of problems.
+    const badge = $("errLogBadge"), n = open + oneOff;
+    if (badge) { badge.hidden = n === 0; badge.textContent = String(n); }
+    $("errLogToggle").title = n ? `Log: ${n} problem${n === 1 ? "" : "s"}` : "Messages and problems";
     $("errLogList").innerHTML = entries.map((e) => {
       const h = hint(e.message);
+      if (e.info) return `<li class="info"><div class="err-head"><span class="mono">${hhmmss(e.at)}</span> <strong>${esc(e.what)}</strong></div></li>`;
       const status = e.fixed ? `<span class="pill ok">Fixed</span>` : e.once ? `<span class="pill neutral">One-off</span>` : `<span class="pill bad">Failing</span>`;
       return `<li class="${e.fixed ? "fixed" : ""}"><div class="err-head"><span class="mono">${hhmmss(e.at)}</span> <strong>${esc(e.what)}</strong> ${status}</div>` +
         (e.message ? `<div class="err-msg mono">${esc(e.message)}</div>` : "") +
@@ -97,6 +107,7 @@
         (e.fixed ? `<div class="err-hint">${esc(e.fixedHow)} at ${hhmmss(e.fixed)}${e.tries ? ` (tried ${e.tries} time${e.tries === 1 ? "" : "s"})` : ""}.</div>`
           : e.tries ? `<div class="err-hint">Tried again ${e.tries} time${e.tries === 1 ? "" : "s"}.</div>` : "") + `</li>`;
     }).join("");
+    if (!entries.length) $("errLogList").innerHTML = `<li class="info"><div class="err-head">No messages yet.</div></li>`;
     $("errLogSummary").textContent = open ? `${open} part${open === 1 ? " is" : "s are"} still failing. Try again fetches only those parts.` : "Nothing is failing now.";
   }
 

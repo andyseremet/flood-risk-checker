@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.5.2">
+<link rel="stylesheet" href="assets/css/style.css?v=1.5.3">
 </head>
 <body>
 <div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
@@ -87,7 +87,7 @@
     </section>
     </details>
 
-    <footer class="note">Open data under OGL v3.0 · Screening only, not an FRA · <span class="nowrap">Version 1.5.2</span> <button type="button" class="info" aria-expanded="false" aria-controls="help-foot" title="Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use." aria-label="Data sources and use">i</button><span class="help" id="help-foot" hidden>Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use.</span></footer>
+    <footer class="note">Open data under OGL v3.0 · Screening only, not an FRA · <span class="nowrap">Version 1.5.3</span> <button type="button" class="info" aria-expanded="false" aria-controls="help-foot" title="Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use." aria-label="Data sources and use">i</button><span class="help" id="help-foot" hidden>Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use.</span></footer>
   </div>
   <div id="mapwrap">
    <div id="mapbox">
@@ -133,17 +133,16 @@
         <button type="button" class="round-btn" id="retryBtn" hidden title="Try again for the parts that failed" aria-label="Try again for the parts that failed">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
-        <span class="errlog" id="errLog" hidden>
-          <button type="button" class="link errlog-toggle" id="errLogToggle" aria-expanded="false" aria-controls="errLogPanel" title="Show the error log">Error log</button>
-        </span>
-        <button type="button" id="pdfBtn" disabled>Download PDF report</button>
-        <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
-        <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
-        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check starts every flood check for the selected site (the pin area or your boundary) and fills in the results. Nothing is fetched before you press it. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
+        <span class="spacer"></span>
+        <button type="button" class="tool-btn" id="pdfBtn" disabled title="Download the PDF report"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>Report</span></button>
+        <button type="button" class="tool-btn" id="exportBtn" disabled title="Export the site boundary as GeoJSON"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Export</span></button>
+        <button type="button" class="tool-btn" id="clearBtn" disabled title="Clear the site from the map"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg><span>Clear</span></button>
+        <button type="button" class="tool-btn errlog-toggle" id="errLogToggle" aria-expanded="false" aria-controls="errLogPanel" title="Messages and problems"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>Log</span><b class="badge" id="errLogBadge" hidden></b></button>
+        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check starts every flood check for the selected site (the pin area or your boundary). Nothing is fetched before you press it. The round arrow appears only when something failed: it tries again for those parts and keeps what worked. Report downloads the PDF. Export saves the site boundary as a GeoJSON file. Clear removes the site. Log lists messages and problems, with a red badge when something failed; Copy log copies it to share." aria-label="What these buttons do">i</button>
       </div>
       <div class="errlog-panel" id="errLogPanel" role="region" aria-label="Error log" hidden>
         <div class="errlog-head">
-          <strong>Error log</strong>
+          <strong>Log</strong>
           <button type="button" class="round-btn small" id="errLogRetry" hidden title="Try again for the parts that failed" aria-label="Try again for the parts that failed">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
@@ -155,9 +154,8 @@
         <p class="hint" id="errLogSummary"></p>
         <ol class="errlog-list" id="errLogList"></ol>
       </div>
-      <p class="help" id="help-bar" hidden>Check starts every flood check for the selected site (the pin area or your boundary) and fills in the results. Nothing is fetched before you press it. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
-      <p class="hint" id="status" role="status"></p>
-      <p class="msg warn net-warn" id="netWarnBox" role="status" hidden><span id="netWarn"></span><button type="button" id="netWarnClose" aria-label="Hide this warning" title="Hide">×</button></p>
+      <p class="help" id="help-bar" hidden>Check starts every flood check for the selected site (the pin area or your boundary). Nothing is fetched before you press it. The round arrow appears only when something failed: it tries again for those parts and keeps what worked. Report downloads the PDF. Export saves the site boundary as a GeoJSON file. Clear removes the site. Log lists messages and problems, with a red badge when something failed; Copy log copies it to share.</p>
+      <p class="hint status" id="status" role="status"></p>
     </div>
   </div>
 </main>
@@ -171,30 +169,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.5.2";</script>
-<script src="js/config.js?v=1.5.2"></script>
-<script src="js/util.js?v=1.5.2"></script>
-<script src="js/progress.js?v=1.5.2"></script>
-<script src="js/error-log.js?v=1.5.2"></script>
-<script src="js/geometry/projections.js?v=1.5.2"></script>
-<script src="js/geometry/measurements.js?v=1.5.2"></script>
-<script src="js/boundary/boundary-validation.js?v=1.5.2"></script>
-<script src="js/boundary/boundary-import.js?v=1.5.2"></script>
-<script src="js/boundary/boundary-export.js?v=1.5.2"></script>
-<script src="js/map/map.js?v=1.5.2"></script>
-<script src="js/map/map-layers.js?v=1.5.2"></script>
-<script src="js/boundary/boundary-draw.js?v=1.5.2"></script>
-<script src="js/location/location-search.js?v=1.5.2"></script>
-<script src="js/flood-data/environment-agency.js?v=1.5.2"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.5.2"></script>
-<script src="js/flood-data/sepa.js?v=1.5.2"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.5.2"></script>
-<script src="js/analysis/intersections.js?v=1.5.2"></script>
-<script src="js/analysis/compute.js?v=1.5.2"></script>
-<script src="js/analysis/flood-analysis.js?v=1.5.2"></script>
-<script src="js/dashboard/results.js?v=1.5.2"></script>
-<script src="js/reporting/assessment.js?v=1.5.2"></script>
-<script src="js/reporting/pdf-report.js?v=1.5.2"></script>
-<script src="js/app.js?v=1.5.2"></script>
+<script>window.FRC_VERSION = "1.5.3";</script>
+<script src="js/config.js?v=1.5.3"></script>
+<script src="js/util.js?v=1.5.3"></script>
+<script src="js/progress.js?v=1.5.3"></script>
+<script src="js/error-log.js?v=1.5.3"></script>
+<script src="js/geometry/projections.js?v=1.5.3"></script>
+<script src="js/geometry/measurements.js?v=1.5.3"></script>
+<script src="js/boundary/boundary-validation.js?v=1.5.3"></script>
+<script src="js/boundary/boundary-import.js?v=1.5.3"></script>
+<script src="js/boundary/boundary-export.js?v=1.5.3"></script>
+<script src="js/map/map.js?v=1.5.3"></script>
+<script src="js/map/map-layers.js?v=1.5.3"></script>
+<script src="js/boundary/boundary-draw.js?v=1.5.3"></script>
+<script src="js/location/location-search.js?v=1.5.3"></script>
+<script src="js/flood-data/environment-agency.js?v=1.5.3"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.5.3"></script>
+<script src="js/flood-data/sepa.js?v=1.5.3"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.5.3"></script>
+<script src="js/analysis/intersections.js?v=1.5.3"></script>
+<script src="js/analysis/compute.js?v=1.5.3"></script>
+<script src="js/analysis/flood-analysis.js?v=1.5.3"></script>
+<script src="js/dashboard/results.js?v=1.5.3"></script>
+<script src="js/reporting/assessment.js?v=1.5.3"></script>
+<script src="js/reporting/pdf-report.js?v=1.5.3"></script>
+<script src="js/app.js?v=1.5.3"></script>
 </body>
 </html>

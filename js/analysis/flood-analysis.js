@@ -71,6 +71,7 @@
       return { ...out, status: "unavailable", statusText: STATUS.unavailable, error: e.message };
     }
     out.retrieved = r.retrieved;
+    out.band = r.band || null;
     out.status = r.band ? "completed" : "none";
     out.statusText = STATUS[out.status];
     out.summary = r.band ? `At the site centroid: ${r.band}.` : "At the site centroid: no surface water risk band mapped.";

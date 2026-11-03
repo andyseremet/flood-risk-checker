@@ -205,6 +205,23 @@
         D += `<p class="hint">Live data is for ${res.fromSite ? "the site centroid" : "this point"}. Change the radius in the Report card.</p>`;
       }
 
+      // Summary: risk by source and the next step (answer first).
+      let S = "";
+      if (FRC.assessment && (a || res)) {
+        const nation = (a && a.nation) || (res && res.nation);
+        const risk = FRC.assessment.riskBySource({ analysis: a, res, nation });
+        const fra = FRC.assessment.fraNeed({ analysis: a, res, site, nation, rows: risk });
+        const link = (u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https:\/\/(www\.)?/, "").split("/")[0])}</a>`;
+        S += `<div class="result"><div class="title"><span>Is a full Flood Risk Assessment needed?</span></div><p><strong>${esc(fra.headline)}</strong></p>` +
+          `<ul>${fra.reasons.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><p><strong>Next steps</strong></p><ol>${fra.actions.map((t) => `<li>${esc(t)}</li>`).join("")}</ol>` +
+          `<p class="hint">Guidance: ${fra.links.map(link).join(" · ")}. The local planning authority makes the final decision.</p></div>`;
+        S += `<div class="tablewrap"><table class="data"><thead><tr><th>Source of flooding</th><th>Rating</th><th>Evidence</th></tr></thead><tbody>` +
+          risk.map((r) => `<tr><td>${esc(r.source)}</td><td>${pill(r.level == null ? (r.rating === "No result" ? "bad" : "neutral") : "info", r.rating)}</td><td class="hint">${esc(r.evidence)}</td></tr>`).join("") +
+          `</tbody></table></div><p class="hint">None mapped means no mapped feature was found; it is not a confirmed low risk.${analysing ? " The site analysis is still running, so this summary will update." : ""}</p>`;
+        const cn = FRC.assessment.climateNote(nation);
+        S += `<p class="hint">${esc(cn.text)} ${link(cn.link)}</p>`;
+      }
+
       // E. Assessment status
       const rows = [];
       if (a) a.datasets.forEach((d) => rows.push({ name: d.name.split(" (")[0], cls: ANALYSIS_PILL[d.status], status: d.statusText, when: d.retrieved, why: d.status === "notAssessed" ? d.notes[0] : d.error }));
@@ -214,7 +231,7 @@
         rows.map((r) => `<tr><td>${esc(r.name)}${r.why ? `<br><span class="hint">${esc(r.why)}</span>` : ""}${r.when ? `<br><span class="hint">Retrieved ${esc(fmtDate(r.when))}</span>` : ""}</td><td>${pill(r.cls, r.status)}</td></tr>`).join("") +
         `</tbody></table></div><p class="hint">A missing map feature, unavailable service or empty result is not evidence that a site is free from flood risk, and never means Flood Zone 1.</p>`;
 
-      el.innerHTML = sec("site", "A", "Site information", A) + sec("zones", "B", "Flood-zone assessment", B) +
+      el.innerHTML = (S ? sec("summary", "!", "Summary: risk by source and next step", S) : "") + sec("site", "A", "Site information", A) + sec("zones", "B", "Flood-zone assessment", B) +
         sec("other", "C", "Additional flood information", C) + sec("live", "D", "Live environmental information", D) +
         sec("status", "E", "Assessment status", E);
     },

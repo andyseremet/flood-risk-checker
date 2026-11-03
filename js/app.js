@@ -475,7 +475,7 @@
           company: $("company").value.trim(), logo: state.logo,
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), checkedBy: $("checkedBy").value.trim(), version: $("version").value.trim(), notes: $("notes").value.trim(),
           gaps: failingParts().filter((g) => !/^(tile|conn):/.test(g.key)),
-          sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
+          sections: { location: $("o-location").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         }), "Building the PDF report");
       } catch (e) { setStatus("Could not build the PDF: " + e.message); }
       state.building = false; btn.disabled = !pdfReady(); btn.querySelector("span").textContent = "Report";

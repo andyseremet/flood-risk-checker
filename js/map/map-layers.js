@@ -8,7 +8,7 @@
   // "export" operation instead, which reprojects on request. SEPA only draws
   // these layers at 1:85,000 or closer, so the layer starts at zoom 13.
   const SEPA_MIN_ZOOM = 13;
-  function sepaLayer(base, opts) {
+  function sepaLayer(base, opts, visible) {
     const Layer = L.TileLayer.extend({
       getTileUrl(c) {
         const size = this.getTileSize();
@@ -18,7 +18,7 @@
         const q = new URLSearchParams({
           bbox: [a.x, b.y, b.x, a.y].join(","), bboxSR: "3857", imageSR: "3857",
           size: size.x + "," + size.y, dpi: "96", format: "png32", transparent: "true",
-          layers: "show:" + FRC.mapLayers.sepaVisible.join(","), f: "image",
+          layers: "show:" + (visible || FRC.mapLayers.sepaVisible).join(","), f: "image",
         });
         return base + "/export?" + q.toString();
       },
@@ -48,6 +48,9 @@
         rec: L.tileLayer.wms(A.eaRecordedWms, { ...opts, layers: "Recorded_Flood_Outlines" }),
         w: L.tileLayer.wms(A.nrw, { ...opts, layers: A.nrwLayer }),
         s: sepaLayer(A.sepa, opts),
+        // Used only for the report's maps (one map per source of flooding).
+        sSw: sepaLayer(A.sepa, opts, [3, 4, 5]),
+        sCo: sepaLayer(A.sepa, opts, [6, 7, 8]),
       };
       for (const k of Object.keys(layers)) {
         const box = document.getElementById("l-" + k);

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.5.3">
+<link rel="stylesheet" href="assets/css/style.css?v=1.6.0">
 </head>
 <body>
 <div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
@@ -40,8 +40,8 @@
     </section>
 
     <section class="card" aria-labelledby="h-report">
-      <h2 id="h-report">3. Report options <button type="button" class="info" aria-expanded="false" aria-controls="help-report" title="Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the summary and the data sources, method and limitations are always included." aria-label="How the report works">i</button></h2>
-      <p class="help" id="help-report" hidden>Pick the sections to include, then press Download PDF report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the summary and the data sources, method and limitations are always included.</p>
+      <h2 id="h-report">3. Report options <button type="button" class="info" aria-expanded="false" aria-controls="help-report" title="Pick the sections to include, then press Report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the cover, contents, summary and the data, method and limitations section are always included." aria-label="How the report works">i</button></h2>
+      <p class="help" id="help-report" hidden>Pick the sections to include, then press Report under the map. Company name and logo are remembered in this browser only. Prepared by, Checked by and Report version go in the document control box on page one. The search radius is used for flood warnings and river gauges. Under More options, tick the sections to include; the cover, contents, summary and the data, method and limitations section are always included.</p>
       <div class="grid2">
         <label>Prepared by<input type="text" id="analyst"></label>
         <label>Checked by<input type="text" id="checkedBy" placeholder="Second person"></label>
@@ -49,13 +49,12 @@
       <details class="more">
         <summary>More options</summary>
         <div class="more-body">
-      <label class="opt"><input type="checkbox" id="o-location" checked> 2. Site location plan</label>
-      <label class="opt"><input type="checkbox" id="o-site" checked> 3. Site boundary and measurements</label>
-      <label class="opt"><input type="checkbox" id="o-zone" checked> 4. Flood-zone assessment</label>
-      <label class="opt"><input type="checkbox" id="o-intersect" checked> 5. Flood-zone spatial intersection (areas and %)</label>
-      <label class="opt"><input type="checkbox" id="o-other" checked> 6. Additional flood information</label>
-      <label class="opt"><input type="checkbox" id="o-live" checked> 7. Flood warnings and river gauges</label>
-      <label class="opt"><input type="checkbox" id="o-maps" checked> Include maps</label>
+      <label class="opt"><input type="checkbox" id="o-location" checked> 2. The site (location, measurements, map)</label>
+      <label class="opt"><input type="checkbox" id="o-zone" checked> 3. Rivers and the sea pages</label>
+      <label class="opt"><input type="checkbox" id="o-other" checked> 3. Other source pages (surface water, reservoirs, past floods)</label>
+      <label class="opt"><input type="checkbox" id="o-intersect" checked> Area tables (how much of the site is affected)</label>
+      <label class="opt"><input type="checkbox" id="o-live" checked> 4. Flood warnings and river gauges</label>
+      <label class="opt"><input type="checkbox" id="o-maps" checked> Include maps (one for each source)</label>
       <label class="grid2" style="grid-template-columns:1fr"><span class="hint">Company name</span><input type="text" id="company" placeholder="Shown on every page"></label>
       <div class="row">
         <label class="filebtn ghost">Add logo<input type="file" id="logoInput" accept="image/png,image/jpeg"></label>
@@ -87,7 +86,7 @@
     </section>
     </details>
 
-    <footer class="note">Open data under OGL v3.0 · Screening only, not an FRA · <span class="nowrap">Version 1.5.3</span> <button type="button" class="info" aria-expanded="false" aria-controls="help-foot" title="Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use." aria-label="Data sources and use">i</button><span class="help" id="help-foot" hidden>Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use.</span></footer>
+    <footer class="note">Open data under OGL v3.0 · Screening only, not an FRA · <span class="nowrap">Version 1.6.0</span> <button type="button" class="info" aria-expanded="false" aria-controls="help-foot" title="Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use." aria-label="Data sources and use">i</button><span class="help" id="help-foot" hidden>Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use.</span></footer>
   </div>
   <div id="mapwrap">
    <div id="mapbox">
@@ -169,30 +168,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.5.3";</script>
-<script src="js/config.js?v=1.5.3"></script>
-<script src="js/util.js?v=1.5.3"></script>
-<script src="js/progress.js?v=1.5.3"></script>
-<script src="js/error-log.js?v=1.5.3"></script>
-<script src="js/geometry/projections.js?v=1.5.3"></script>
-<script src="js/geometry/measurements.js?v=1.5.3"></script>
-<script src="js/boundary/boundary-validation.js?v=1.5.3"></script>
-<script src="js/boundary/boundary-import.js?v=1.5.3"></script>
-<script src="js/boundary/boundary-export.js?v=1.5.3"></script>
-<script src="js/map/map.js?v=1.5.3"></script>
-<script src="js/map/map-layers.js?v=1.5.3"></script>
-<script src="js/boundary/boundary-draw.js?v=1.5.3"></script>
-<script src="js/location/location-search.js?v=1.5.3"></script>
-<script src="js/flood-data/environment-agency.js?v=1.5.3"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.5.3"></script>
-<script src="js/flood-data/sepa.js?v=1.5.3"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.5.3"></script>
-<script src="js/analysis/intersections.js?v=1.5.3"></script>
-<script src="js/analysis/compute.js?v=1.5.3"></script>
-<script src="js/analysis/flood-analysis.js?v=1.5.3"></script>
-<script src="js/dashboard/results.js?v=1.5.3"></script>
-<script src="js/reporting/assessment.js?v=1.5.3"></script>
-<script src="js/reporting/pdf-report.js?v=1.5.3"></script>
-<script src="js/app.js?v=1.5.3"></script>
+<script>window.FRC_VERSION = "1.6.0";</script>
+<script src="js/config.js?v=1.6.0"></script>
+<script src="js/util.js?v=1.6.0"></script>
+<script src="js/progress.js?v=1.6.0"></script>
+<script src="js/error-log.js?v=1.6.0"></script>
+<script src="js/geometry/projections.js?v=1.6.0"></script>
+<script src="js/geometry/measurements.js?v=1.6.0"></script>
+<script src="js/boundary/boundary-validation.js?v=1.6.0"></script>
+<script src="js/boundary/boundary-import.js?v=1.6.0"></script>
+<script src="js/boundary/boundary-export.js?v=1.6.0"></script>
+<script src="js/map/map.js?v=1.6.0"></script>
+<script src="js/map/map-layers.js?v=1.6.0"></script>
+<script src="js/boundary/boundary-draw.js?v=1.6.0"></script>
+<script src="js/location/location-search.js?v=1.6.0"></script>
+<script src="js/flood-data/environment-agency.js?v=1.6.0"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.6.0"></script>
+<script src="js/flood-data/sepa.js?v=1.6.0"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.6.0"></script>
+<script src="js/analysis/intersections.js?v=1.6.0"></script>
+<script src="js/analysis/compute.js?v=1.6.0"></script>
+<script src="js/analysis/flood-analysis.js?v=1.6.0"></script>
+<script src="js/dashboard/results.js?v=1.6.0"></script>
+<script src="js/reporting/assessment.js?v=1.6.0"></script>
+<script src="js/reporting/pdf-report.js?v=1.6.0"></script>
+<script src="js/app.js?v=1.6.0"></script>
 </body>
 </html>

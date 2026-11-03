@@ -9,6 +9,11 @@
   // Remembers the middle of the map after each move, so a resize can put it back.
   const keepCentre = () => { if (!snapping && lastCentre) map.setView(lastCentre, map.getZoom(), { animate: false }); };
   const takeSnapshot = (opts) => FRC.map._snapshot(opts);
+  // Approximate width of the map image on the ground, for the caption.
+  function scaleText() {
+    const b = map.getBounds(), w = map.distance(b.getSouthWest(), L.latLng(b.getSouth(), b.getEast()));
+    return w >= 2000 ? `${(w / 1000).toFixed(1)} km across` : `${Math.round(w / 10) * 10} m across`;
+  }
 
   // Resolves when every tile layer on the map has finished loading, or after
   // the timeout so a slow or blocked service cannot stall the report.
@@ -124,7 +129,8 @@
       return run;
     },
 
-    async _snapshot({ view, overlays = [], analysis = false, width = 900, height = 600 }) {
+    // minZoom: zoom in at least this far (some layers only draw when close in).
+    async _snapshot({ view, overlays = [], analysis = false, width = 900, height = 600, minZoom = 0 }) {
       const el = map.getContainer();
       snapping = true;
       const layers = (FRC.mapLayers && FRC.mapLayers.layers) || {};
@@ -140,9 +146,10 @@
         if (analysisLayer) { if (analysis && !hadAnalysis) analysisLayer.addTo(map); if (!analysis && hadAnalysis) map.removeLayer(analysisLayer); }
         if (view.bounds) map.fitBounds(view.bounds, { padding: [30, 30], maxZoom: 18, animate: false });
         else map.setView(view.center, view.zoom, { animate: false });
+        if (map.getZoom() < minZoom) map.setZoom(minZoom, { animate: false });
         await waitForTiles(map, 8000);
         const canvas = await compose(el, width, height);
-        return { img: canvas.toDataURL("image/jpeg", 0.85), w: canvas.width, h: canvas.height };
+        return { img: canvas.toDataURL("image/jpeg", 0.85), w: canvas.width, h: canvas.height, zoom: map.getZoom(), scale: scaleText() };
       } finally {
         Object.assign(el.style, style);
         map.invalidateSize(false);

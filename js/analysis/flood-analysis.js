@@ -106,7 +106,8 @@
       out.statusText += " (areas estimated)";
       out.notes.push(`These polygons were too complex to clip exactly, so the areas are estimated from ${FRC.util.fmtNum(est.estimate.points, 0)} sample points about ${FRC.util.fmtNum(est.estimate.spacing, 1)} m apart. Expect an error of about 1 to 2% of the site. The estimated parts are not shaded on the map.`);
     }
-    if (fetched.partial) out.notes.push("The service returned only part of the polygons for this area (its result limit was reached). Areas may be under-counted.");
+    (fetched.notes || []).forEach((n) => out.notes.push(n));
+    if (fetched.partial && !(fetched.notes || []).length) out.notes.push("The service returned only part of the polygons for this area (its result limit was reached). Areas may be under-counted.");
     if (!anyHit && !fetched.partial) out.notes.push(ds.primary
       ? "No mapped polygon from this dataset intersects the site. This does not establish that the site is free from flood risk or that it is in Flood Zone 1."
       : "No mapped polygon from this dataset intersects the site. This does not establish that the site is free from this type of flood risk.");

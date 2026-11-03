@@ -104,10 +104,22 @@
       try { const v = await fn(); const [verdict, detail, data] = judge(v); add("Live data", title, verdict, detail, data); }
       catch (e) { add("Live data", title, "Fail", ["Request failed: " + e.message]); }
     };
+    // A point known to lie inside a mapped Flood Zone 3 polygon near York, so
+    // the risk band check has to find something there. (The site centre is
+    // outside the mapped zones, so an empty answer there proves nothing.)
+    let fz3 = null;
     await probe("EA flood zone values near York", () => FRC.ea.zonesInBox(york), (r) => {
       const zones = [...new Set(r.features.map((f) => f.properties && f.properties.flood_zone))];
       const srcs = [...new Set(r.features.map((f) => f.properties && f.properties.flood_source))];
-      return [zones.some((z) => z === "FZ2" || z === "FZ3") ? "Pass" : "Check", [`${r.features.length} polygons. flood_zone values: ${zones.join(", ") || "none"}. flood_source values: ${srcs.join(", ") || "none"}.`], { keys: keysOf(r.features[0]), zones, srcs }];
+      for (const f of r.features) {
+        if (!f.properties || f.properties.flood_zone !== "FZ3" || !f.geometry) continue;
+        try {
+          const part = turf.bboxClip({ type: "Feature", properties: {}, geometry: f.geometry }, york);
+          const c = turf.pointOnFeature(part).geometry.coordinates;
+          if (FRC.util.inGeometry(c[0], c[1], f.geometry)) { fz3 = { lon: c[0], lat: c[1] }; break; }
+        } catch { /* try the next polygon */ }
+      }
+      return [zones.some((z) => z === "FZ2" || z === "FZ3") ? "Pass" : "Check", [`${r.features.length} polygons. flood_zone values: ${zones.join(", ") || "none"}. flood_source values: ${srcs.join(", ") || "none"}.`, fz3 ? `Point inside Flood Zone 3 used for the band checks: ${fz3.lat.toFixed(5)}, ${fz3.lon.toFixed(5)}.` : "No Flood Zone 3 point found for the band checks."], { keys: keysOf(r.features[0]), zones, srcs, fz3 }];
     });
     await probe("NRW flood zone field (Swansea)", () => FRC.nrw.zonesInBox(swansea), (r) => {
       const items = FRC.normalise.nrw(r.features);
@@ -116,46 +128,15 @@
       const ok = classes.some((k) => k === "W-FZ2" || k === "W-FZ3");
       return [ok ? "Pass" : "Check", [`${r.features.length} polygons. Classes read: ${classes.join(", ") || "none"}.`, ok ? "The app can read the Wales flood zone." : "The app could not read Zone 2 or 3 from these properties. Send this report so the field name can be fixed."], { keys: keysOf(r.features[0]), sample }];
     });
-    await probe("EA surface water band attribute (York)", () => FRC.ea.surfaceWaterAtPoint(53.9572, -1.0812), (r) => [
+    const pt = fz3 || { lat: 53.9572, lon: -1.0812 };
+    const where = fz3 ? "inside Flood Zone 3, York" : "York site centre";
+    const bandDetail = (r) => [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (found using ${r.format}).` : "No feature returned at this point."];
+    await probe(`EA risk band attribute (${where})`, () => FRC.ea.riskBand(pt.lat, pt.lon), (r) => [
+      r.band && r.band !== "See details" ? "Pass" : fz3 ? "Fail" : "Check",
+      [...bandDetail(r), ...(!r.band && fz3 ? ["Flood Zone 3 areas almost always carry a river and sea risk band, so the point query is probably not working."] : [])], { raw: r.raw, tried: r.tried }]);
+    await probe(`EA surface water band attribute (${where})`, () => FRC.ea.surfaceWaterAtPoint(pt.lat, pt.lon), (r) => [
       r.band && !/not stated/.test(r.band) ? "Pass" : "Check",
-      [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (found using ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
-    await probe("EA risk band attribute (York)", () => FRC.ea.riskBand(53.9572, -1.0812), (r) => [
-      r.band && r.band !== "See details" ? "Pass" : "Check", [`Band read: ${r.band || "none at this point"}.`, r.raw ? `Properties: ${Object.keys(r.raw).join(", ")} (found using ${r.format}).` : "No feature returned at this point."], { raw: r.raw, tried: r.tried }]);
-    // What the two map-image services say they support, in case the point
-    // checks above return nothing.
-    for (const [title, url] of [["EA risk band map service (capabilities)", FRC.config.api.eaRiskWms], ["EA surface water map service (capabilities)", FRC.config.api.eaSurfaceWms]]) {
-      await probe(title, async () => {
-        const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 20000);
-        try { const res = await fetch(`${url}?service=WMS&request=GetCapabilities&version=1.3.0`, { signal: ctrl.signal }); return await res.text(); } finally { clearTimeout(t); }
-      }, (xml) => {
-        const info = (xml.match(/<GetFeatureInfo>([\s\S]*?)<\/GetFeatureInfo>/) || [, ""])[1];
-        const formats = [...info.matchAll(/<Format>([^<]+)<\/Format>/g)].map((m) => m[1]);
-        const layers = [...xml.matchAll(/<Layer([^>]*)>\s*<Name>([^<]+)<\/Name>/g)].map((m) => m[2] + (/queryable="1"/.test(m[1]) ? " (queryable)" : ""));
-        return [layers.length ? "Pass" : "Check", [`Layers: ${layers.join(", ") || "none found"}.`, `Point query formats: ${formats.join(", ") || "none listed"}.`], { layers, formats }];
-      });
-    }
-    // Other ways the same NaFRA2 data may be published (feature APIs),
-    // in case the map-image point query stays empty.
-    for (const [title, wms] of [["EA risk band data, other access routes", FRC.config.api.eaRiskWms], ["EA surface water data, other access routes", FRC.config.api.eaSurfaceWms]]) {
-      const base = wms.replace(/\/wms$/, "");
-      await probe(title, async () => {
-        const get = async (u) => {
-          const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 20000);
-          try { const res = await fetch(u, { signal: ctrl.signal }); const text = await res.text(); return res.ok ? text : "HTTP " + res.status; }
-          catch (e) { return "error: " + e.message; } finally { clearTimeout(t); }
-        };
-        const ogc = await get(`${base}/ogc/features/v1/collections?f=json`);
-        const wfs = await get(`${base}/wfs?service=WFS&request=GetCapabilities`);
-        return { ogc, wfs };
-      }, ({ ogc, wfs }) => {
-        let cols = [];
-        try { cols = (JSON.parse(ogc).collections || []).map((c) => c.id); } catch { /* not JSON */ }
-        const types = [...wfs.matchAll(/<(?:wfs:)?FeatureType>\s*<(?:wfs:)?Name>([^<]+)<\//g)].map((m) => m[1]);
-        return [cols.length || types.length ? "Pass" : "Check", [
-          `OGC API collections: ${cols.join(", ") || ogc.slice(0, 80)}.`,
-          `WFS feature types: ${types.join(", ") || wfs.slice(0, 80)}.`], { cols, types }];
-      });
-    }
+      [...bandDetail(r), ...(!r.band ? ["Surface water risk is not mapped everywhere, so an empty answer here may be correct."] : [])], { raw: r.raw, tried: r.tried }]);
     await probe("EA reservoir extent fields (York)", () => FRC.ea.reservoirInBox(york), (r) => [
       r.features.length ? (keysOf(r.features[0]).includes("reservoir") ? "Pass" : "Check") : "Check",
       [`${r.features.length} extents. Fields: ${keysOf(r.features[0]).join(", ") || "none returned"}.`], { names: r.features.slice(0, 5).map((f) => f.properties && f.properties.reservoir) }]);
@@ -180,6 +161,7 @@
         return `${g.group} [${g.rows.map((r) => `${r.key} ${r.percent.toFixed(1)}%`).join(", ") || "none"}; no polygon ${g.remainingPercent.toFixed(1)}%]`;
       });
       detail.push(s + (d.summary ? `. ${d.summary}` : "") + (groups.length ? ". " + groups.join(" ") : ""));
+      if (d.status === "partial") (d.notes || []).slice(0, 2).forEach((n) => detail.push("    Note: " + n));
       data[d.id] = { status: d.status, est: Boolean(d.estimated), rows: (d.groups || []).flatMap((g) => g.rows.map((r) => [r.key, +r.percent.toFixed(2)])) };
     });
     const e = site.expect, byId = (id) => a.datasets.find((d) => d.id === id);

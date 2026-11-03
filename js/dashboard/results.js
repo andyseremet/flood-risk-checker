@@ -1,4 +1,4 @@
-// Results panel: site measurements, flood-data results and data status.
+// Results dashboard: site measurements, flood analysis, live data and data status.
 // Status wording follows the agreed vocabulary, so a missing result is never
 // shown as "safe": Data retrieved · No mapped feature identified · Not assessed ·
 // Service unavailable.
@@ -24,10 +24,10 @@
     if (z.kind === "england") {
       if (!z.zone) return { status: "none", pill: ["info", "No mapped polygon"], text: "No Flood Zone 2 or 3 polygon was identified at this point in the queried dataset. This result alone does not establish a definitive Flood Zone 1 classification; check the current official planning map and any relevant site-specific information." };
       const src = z.sources.length ? ` Source: ${z.sources.join(" and ")}.` : "";
-      return { status: "retrieved", pill: [z.zone === "FZ3" ? "bad" : "warn", z.zone.replace("FZ", "Zone ")], text: C.zoneMeaning[z.zone] + src };
+      return { status: "retrieved", pill: ["info", z.zone.replace("FZ", "Zone ")], text: C.zoneMeaning[z.zone] + src };
     }
     if (z.kind === "wales") {
-      const cls = /3/.test(z.zone) ? "bad" : /2/.test(z.zone) || /mapped flood zone/i.test(z.zone) ? "warn" : "info";
+      const cls = "info";
       const text = z.matchedFeatures === 0
         ? "No mapped polygon was identified by this query. This does not establish that the location is free from flood risk; consult the current Natural Resources Wales mapping."
         : "Natural Resources Wales Flood Map for Planning (rivers and sea).";
@@ -35,11 +35,12 @@
     }
     const entries = Object.entries(z.found);
     if (!entries.length) return { status: "none", pill: ["info", "No feature identified"], text: "The SEPA identify query returned no matching flood feature. This is not a guarantee that the location is free from flood risk; consult SEPA's current flood maps for confirmation." };
-    const worst = entries.some(([, l]) => l === "High") ? "bad" : entries.some(([, l]) => l === "Medium") ? "warn" : "info";
-    return { status: "retrieved", pill: [worst, "In flood extent"], text: entries.map(([s, l]) => `${s}: ${l} likelihood (${C.sepaMeaning[l]})`).join(". ") + "." };
+    return { status: "retrieved", pill: ["info", "In flood extent"], text: entries.map(([s, l]) => `${s}: ${l} likelihood (${C.sepaMeaning[l]})`).join(". ") + "." };
   }
 
-  function bandClass(b) { b = (b || "").toLowerCase(); return b.includes("high") ? "bad" : b.includes("medium") ? "warn" : "info"; }
+  // Classifications use one neutral colour: colour is kept for data status
+  // (unavailable, partial), never to suggest that a site is safe or unsafe.
+  function bandClass() { return "info"; }
 
   // Overall data status for each dataset, used on screen and in the PDF.
   function dataStatus(res) {
@@ -77,28 +78,6 @@
     groupFinding,
     analysisTable,
 
-    renderAnalysis(el, a) {
-      if (!a) { el.innerHTML = ""; return; }
-      const assessed = a.datasets.filter((d) => d.status !== "notAssessed");
-      const skipped = a.datasets.filter((d) => d.status === "notAssessed");
-      let html = a.notes.map((n) => `<p class="msg warn">${esc(n)}</p>`).join("");
-      assessed.forEach((d) => {
-        html += `<div class="result"><div class="title"><span>${esc(d.name)}</span>${pill(ANALYSIS_PILL[d.status], d.statusText)}</div>`;
-        if (d.error) html += `<p>${esc(d.error)}</p>`;
-        if (d.summary) html += `<p>${esc(d.summary)}</p>`;
-        (d.groups || []).forEach((g) => {
-          if (d.groups.length > 1 || g.group !== d.nation) html += `<p><strong>${esc(g.group)}</strong></p>`;
-          html += `<p>${esc(groupFinding(g, d.noneText))}</p>` + analysisTable(g, d.noneText);
-        });
-        html += d.notes.map((n) => `<p class="hint">${esc(n)}</p>`).join("");
-        if (d.retrieved) html += `<p class="hint">Data retrieved ${esc(fmtDate(d.retrieved))}.</p>`;
-        html += `</div>`;
-      });
-      if (skipped.length) html += `<p class="hint"><strong>Not assessed</strong></p><ul class="hint">${skipped.map((d) => `<li>${esc(d.name.split(" (")[0])}: ${esc(d.notes[0] || "")}</li>`).join("")}</ul>`;
-      html += `<p class="hint">Areas are calculated in British National Grid by intersecting the site boundary with each dataset's polygons. Flood polygons are not assumed to be a complete partition: overlaps are counted once, in the more severe class.</p>`;
-      el.innerHTML = html;
-    },
-
     zoneSummary,
     bandClass,
     dataStatus,
@@ -133,35 +112,111 @@
       el.innerHTML = html;
     },
 
-    renderResults(el, res) {
-      const p = res.place;
-      const z = zoneSummary(res);
-      let html = `<div class="result"><div class="title"><span>${res.fromSite ? "Site centroid" : "Location"}</span>${pill("neutral", res.nation)}</div>
-        <dl class="kv">
-          <dt>Postcode</dt><dd>${esc((p && p.postcode) || "Not found")}</dd>
-          <dt>Area</dt><dd>${esc([p && p.admin_ward, p && p.admin_district].filter(Boolean).join(", ") || "-")}</dd>
-          <dt>Coordinates</dt><dd class="mono">${res.lat.toFixed(5)}, ${res.lon.toFixed(5)}</dd>
-          ${p && p.eastings ? `<dt>Grid ref</dt><dd class="mono">E ${p.eastings}, N ${p.northings}</dd>` : ""}
-        </dl>${res.fromSite ? `<p class="hint">These point checks use the site centroid. The site-wide flood-zone analysis covers the whole boundary.</p>` : ""}</div>`;
-      html += `<div class="result"><div class="title"><span>Flood zone</span>${pill(z.pill[0], z.pill[1])}</div><p>${esc(z.text)}</p></div>`;
-      if (res.band || res.errors.band) {
-        html += res.band
-          ? (res.band.band
-            ? `<div class="result"><div class="title"><span>Long-term risk (rivers and sea)</span>${pill(bandClass(res.band.band), res.band.band)}</div><p>Environment Agency risk band, taking flood defences into account.</p></div>`
-            : `<div class="result"><div class="title"><span>Long-term risk (rivers and sea)</span>${pill("info", "No band mapped")}</div><p>No risk band was returned at this point. This is not a confirmed "very low" result.</p></div>`)
-          : `<div class="result"><div class="title"><span>Long-term risk</span>${pill("bad", "Unavailable")}</div><p>${esc(res.errors.band)}</p></div>`;
+    // The results dashboard, in the five sections of the spec:
+    // A site information, B flood-zone assessment, C additional flood
+    // information, D live environmental information, E assessment status.
+    renderDashboard(el, { site, current: res, analysis: a, siteName, analysing, analysisError }) {
+      const hasSite = site && site.features.length > 0;
+      if (!hasSite && !res) { el.innerHTML = ""; return; }
+      const sec = (id, letter, title, body) => `<details class="dash-sec" id="dash-${id}" open><summary><h3><span class="dash-letter">${letter}</span>${esc(title)}</h3></summary>${body}</details>`;
+      const block = (title, pillHtml, body) => `<div class="result"><div class="title"><span>${esc(title)}</span>${pillHtml || ""}</div>${body}</div>`;
+      const when = (d) => d ? `<p class="hint">Retrieved ${esc(fmtDate(d))}.</p>` : "";
+      const byId = (id) => a && a.datasets.find((d) => d.id === id);
+      const assessed = (d) => d && d.status !== "notAssessed";
+      const datasetBody = (d) => {
+        let h = "";
+        if (d.error) h += `<p>${esc(d.error)}</p>`;
+        if (d.summary) h += `<p>${esc(d.summary)}</p>`;
+        (d.groups || []).forEach((g) => {
+          if (d.groups.length > 1 || g.group !== d.nation) h += `<p><strong>${esc(g.group)}</strong></p>`;
+          h += `<p>${esc(groupFinding(g, d.noneText))}</p>` + analysisTable(g, d.noneText);
+        });
+        h += d.notes.map((n) => `<p class="hint">${esc(n)}</p>`).join("");
+        return h + when(d.retrieved);
+      };
+      const pending = analysing
+        ? `<p class="hint">Fetching flood polygons for the site and calculating intersections…</p>`
+        : analysisError ? `<p class="msg bad">${esc("The site analysis could not be completed: " + analysisError)}</p>`
+        : hasSite ? `<p class="hint">Press <strong>Analyse site</strong> to measure how much of the site lies in each mapped area.</p>`
+        : `<p class="hint">Draw or import a site boundary to measure how much of it lies in each mapped area.</p>`;
+
+      // A. Site information
+      const p = res && res.place;
+      const m = hasSite ? site.measured : null;
+      let A = `<dl class="kv">
+        <dt>Site name</dt><dd>${esc(siteName || "Not given")}</dd>
+        <dt>Location</dt><dd>${esc((p && [p.admin_ward, p.admin_district].filter(Boolean).join(", ")) || "-")}</dd>
+        <dt>Postcode</dt><dd>${esc((p && p.postcode) || "Not found")}</dd>
+        <dt>Country</dt><dd>${esc((res && res.nation) || (a && a.nation) || "Not checked yet")}</dd>`;
+      if (m) A += `
+        <dt>Site area</dt><dd class="mono">${fmtNum(m.area, 0)} m² · ${fmtNum(m.hectares, 2)} ha · ${fmtNum(m.acres, 2)} acres</dd>
+        <dt>Perimeter</dt><dd class="mono">${fmtNum(m.perimeter, 1)} m</dd>
+        <dt>Centroid</dt><dd class="mono">${m.centroidWGS[1].toFixed(6)}, ${m.centroidWGS[0].toFixed(6)}</dd>
+        <dt>Grid ref</dt><dd class="mono">E ${fmtNum(m.centroidBNG[0], 1)}, N ${fmtNum(m.centroidBNG[1], 1)}</dd>`;
+      else if (res) A += `
+        <dt>Coordinates</dt><dd class="mono">${res.lat.toFixed(5)}, ${res.lon.toFixed(5)}</dd>
+        ${p && p.eastings ? `<dt>Grid ref</dt><dd class="mono">E ${p.eastings}, N ${p.northings}</dd>` : ""}`;
+      A += `</dl>`;
+      if (!m) A += `<p class="hint">No site boundary yet: these results are for a single point.</p>`;
+
+      // B. Flood-zone assessment
+      let B = "";
+      const zoneSets = a ? a.datasets.filter((d) => d.primary) : [];
+      if (a) {
+        a.notes.forEach((n) => { B += `<p class="msg warn">${esc(n)}</p>`; });
+        zoneSets.filter(assessed).forEach((d) => { B += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d)); });
+        B += `<p class="hint">The mapped parts of the site are shaded on the map: darkest for the most severe class. Areas are measured in British National Grid. Overlapping polygons are counted once, in the more severe class.</p>`;
+      } else B += pending;
+      if (res) {
+        const z = zoneSummary(res);
+        B += block(res.fromSite ? "Flood zone at the site centroid" : "Flood zone at this point", pill(z.pill[0], z.pill[1]), `<p>${esc(z.text)}</p>` + when(res.zone && res.zone.retrieved));
+        if (res.band || res.errors.band) {
+          B += res.errors.band
+            ? block("Long-term risk, rivers and sea (England)", pill("bad", "Service unavailable"), `<p>${esc(res.errors.band)}</p>`)
+            : res.band.band
+              ? block("Long-term risk, rivers and sea (England)", pill("info", res.band.band), `<p>Environment Agency risk band at ${res.fromSite ? "the site centroid" : "this point"}, taking flood defences into account.</p>` + when(res.band.retrieved))
+              : block("Long-term risk, rivers and sea (England)", pill("info", "No band mapped"), `<p>No risk band was returned at this point. This is not a confirmed "very low" result.</p>` + when(res.band.retrieved));
+        }
       }
-      if (res.live || res.errors.live) {
-        if (res.errors.live) html += `<div class="result"><div class="title"><span>Live warnings</span>${pill("bad", "Unavailable")}</div><p>${esc(res.errors.live)}</p></div>`;
-        else if (!res.live.length) html += `<div class="result"><div class="title"><span>Live warnings within ${res.dist} km</span>${pill("info", "None in force")}</div><p>No flood warnings or alerts in force at ${esc(fmtDate(res.liveAt))}.</p></div>`;
-        else html += `<div class="result"><div class="title"><span>Live warnings within ${res.dist} km</span>${pill(res.live.some((w) => w.level <= 2) ? "bad" : "warn", res.live.length + " in force")}</div>${res.live.map((w) => `<p><strong>${esc(w.severity)}</strong>: ${esc(w.description)} <span class="hint">(${esc(fmtDate(w.raised))})</span></p>`).join("")}</div>`;
+
+      // C. Additional flood information
+      let C = "";
+      if (a) {
+        a.datasets.filter((d) => !zoneSets.includes(d) && d.id !== "gw" && assessed(d))
+          .forEach((d) => { C += block(d.name, pill(ANALYSIS_PILL[d.status], d.statusText), datasetBody(d)); });
+        if (!C) C += `<p class="hint">Surface water, reservoir and recorded flood data are currently available for sites in England only.${a.nation === "Scotland" ? " For Scotland, surface water and coastal extents are part of the SEPA analysis in section B." : ""}</p>`;
+        const gw = byId("gw");
+        if (gw) C += block("Groundwater flooding", pill(ANALYSIS_PILL.notAssessed, gw.statusText), `<p class="hint">${esc(gw.notes[0])}</p>`);
+      } else C += pending;
+
+      // D. Live environmental information
+      let D = "";
+      if (!res) D = `<p class="hint">Not checked yet.</p>`;
+      else if (res.nation !== "England" && res.nation !== "Unknown") D = `<p class="hint">Live warnings and river gauges are available for England only.</p>`;
+      else {
+        if (res.errors.live) D += block("Flood warnings and alerts", pill("bad", "Service unavailable"), `<p>${esc(res.errors.live)}</p>`);
+        else if (res.live) D += block(`Flood warnings and alerts within ${res.dist} km`, pill("info", res.live.length ? res.live.length + " in force" : "None in force"),
+          (res.live.length ? res.live.map((w) => `<p><strong>${esc(w.severity)}</strong>: ${esc(w.description)} <span class="hint">(raised ${esc(fmtDate(w.raised))})</span></p>`).join("") : `<p>No flood warnings or alerts in force.</p>`) + when(res.liveAt));
+        if (res.errors.gauges) D += block("River gauges", pill("bad", "Service unavailable"), `<p>${esc(res.errors.gauges)}</p>`);
+        else if (res.gauges) D += block(`River gauges within ${res.dist} km`, pill("info", res.gauges.length ? res.gauges.length + " found" : "None found"),
+          (res.gauges.length ? `<div class="tablewrap"><table class="data"><thead><tr><th>Gauge</th><th class="num">Distance</th><th class="num">Latest level</th><th>Reading time</th></tr></thead><tbody>` +
+            res.gauges.map((g) => `<tr><td>${esc(g.name)}${g.river ? `<br><span class="hint">${esc(g.river)}</span>` : ""}</td><td class="num">${g.km.toFixed(1)} km</td><td class="num">${g.value != null ? g.value.toFixed(2) + " m" : "-"}</td><td>${g.value != null ? esc(fmtDate(g.time)) : "No recent reading"}</td></tr>`).join("") +
+            `</tbody></table></div>` : `<p>No river level gauges in this radius.</p>`) + when(res.liveAt));
+        D += `<p class="hint">Live data is for ${res.fromSite ? "the site centroid" : "this point"}. Change the radius in the Report card.</p>`;
       }
-      if (res.gauges && res.gauges.length) {
-        html += `<div class="result"><div class="title"><span>Nearest river gauges</span></div>${res.gauges.map((g) => `<p>${esc(g.name)}${g.river ? ", " + esc(g.river) : ""} <span class="hint">${g.km.toFixed(1)} km</span><br><span class="mono">${g.value != null ? g.value.toFixed(2) + " m at " + esc(fmtDate(g.time)) : "No recent reading"}</span></p>`).join("")}</div>`;
-      }
-      html += `<div class="result"><div class="title"><span>Data status</span></div><ul class="checks">` +
-        dataStatus(res).map((r) => `<li><span>${esc(r.name)}${r.when ? ` <span class="hint">${esc(fmtDate(r.when))}</span>` : ""}</span>${pill(r.status[0], r.status[1])}</li>`).join("") + `</ul></div>`;
-      el.innerHTML = html;
+
+      // E. Assessment status
+      const rows = [];
+      if (a) a.datasets.forEach((d) => rows.push({ name: d.name.split(" (")[0], cls: ANALYSIS_PILL[d.status], status: d.statusText, when: d.retrieved, why: d.status === "notAssessed" ? d.notes[0] : d.error }));
+      else if (hasSite) rows.push({ name: "Site-wide analysis", cls: "neutral", status: analysing ? "In progress" : "Not assessed", why: analysing ? "" : "Not run yet." });
+      if (res) dataStatus(res).forEach((r) => rows.push({ name: r.name + (res.fromSite ? " (site centroid)" : " (point)"), cls: r.status[0], status: r.status[1], when: r.when }));
+      const E = `<div class="tablewrap"><table class="data status"><thead><tr><th>Dataset</th><th>Status</th></tr></thead><tbody>` +
+        rows.map((r) => `<tr><td>${esc(r.name)}${r.why ? `<br><span class="hint">${esc(r.why)}</span>` : ""}${r.when ? `<br><span class="hint">Retrieved ${esc(fmtDate(r.when))}</span>` : ""}</td><td>${pill(r.cls, r.status)}</td></tr>`).join("") +
+        `</tbody></table></div><p class="hint">A missing map feature, unavailable service or empty result is not evidence that a site is free from flood risk, and never means Flood Zone 1.</p>`;
+
+      el.innerHTML = sec("site", "A", "Site information", A) + sec("zones", "B", "Flood-zone assessment", B) +
+        sec("other", "C", "Additional flood information", C) + sec("live", "D", "Live environmental information", D) +
+        sec("status", "E", "Assessment status", E);
     },
   };
 })(typeof window !== "undefined" ? window : globalThis);

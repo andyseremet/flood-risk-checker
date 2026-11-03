@@ -53,10 +53,10 @@
         const when = [fmtDay(p.start_date), fmtDay(p.end_date)].filter(Boolean);
         return [p.name || "Unnamed event", when.length ? when.join(" to ") : null, p.flood_src && `source ${p.flood_src}`, p.flood_caus && `cause ${p.flood_caus}`].filter(Boolean).join(", ");
       })), "Recorded outlines show where flooding has been recorded since about 1946. They are not complete: many past floods were never mapped, and the absence of an outline does not mean a site has never flooded."] },
-    { id: "nrw", nation: "Wales", name: "Natural Resources Wales Flood Map for Planning (rivers and sea)",
+    { id: "nrw", nation: "Wales", primary: true, name: "Natural Resources Wales Flood Map for Planning (rivers and sea)",
       fetch: (box) => FRC.nrw.zonesInBox(box), normalise: (f) => FRC.normalise.nrw(f),
       noneText: "No flood zone polygon mapped" },
-    { id: "sepa", nation: "Scotland", name: "SEPA Flood Maps (river, surface water and coastal)",
+    { id: "sepa", nation: "Scotland", primary: true, name: "SEPA Flood Maps (river, surface water and coastal)",
       fetch: (box) => FRC.sepa.extentsInBox(box), normalise: (f) => FRC.normalise.sepa(f),
       noneText: "No flood extent mapped" },
     { id: "gw", nation: "All", kind: "none", name: "Groundwater flooding",

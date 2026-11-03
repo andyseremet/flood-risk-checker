@@ -12,8 +12,20 @@
     importNotes: [],    // messages from the last import, kept until the site is cleared
     analysis: null,     // last site-wide flood-zone analysis (cleared when the site changes)
     analysisSeq: 0,
+    analysing: false,
+    analysisError: null,
   };
   FRC.state = state;
+
+  // ---------- Results dashboard ----------
+  function renderDashboard() {
+    const show = state.site.features.length > 0 || Boolean(state.current);
+    $("dashCard").hidden = !show;
+    FRC.results.renderDashboard($("dashboard"), {
+      site: state.site, current: state.current, analysis: state.analysis,
+      siteName: $("siteName").value.trim(), analysing: state.analysing, analysisError: state.analysisError,
+    });
+  }
 
   // ---------- Site boundary ----------
   function recomputeSite() {
@@ -29,10 +41,11 @@
     // Any change to the boundary makes the previous analysis out of date.
     state.analysisSeq++;
     state.analysis = null;
+    state.analysing = false;
+    state.analysisError = null;
     FRC.map.showAnalysis(null);
-    FRC.results.renderAnalysis($("analysis"), null);
-    $("analysisCard").hidden = true;
     FRC.results.renderSite($("siteInfo"), site);
+    renderDashboard();
     const has = site.features.length > 0;
     $("exportBtn").disabled = !has;
     $("clearBtn").disabled = !has;
@@ -98,8 +111,7 @@
 
     FRC.map.showGauges(res.gauges);
     state.current = res;
-    FRC.results.renderResults($("results"), res);
-    $("resultsCard").hidden = false;
+    renderDashboard();
     $("status").textContent = `Checked ${FRC.util.fmtDate(res.when)}.`;
     $("pdfBtn").disabled = false;
   }
@@ -110,8 +122,9 @@
     if (!m || !m.centroidWGS) return;
     const seq = ++state.analysisSeq;
     const features = state.site.features;
-    $("analysisCard").hidden = false;
-    $("analysis").innerHTML = `<p class="hint">Fetching flood zone polygons for the site and calculating intersections…</p>`;
+    state.analysing = true;
+    state.analysisError = null;
+    renderDashboard();
     $("siteCheckBtn").disabled = true;
     try {
       await runCheck({ lat: m.centroidWGS[1], lon: m.centroidWGS[0], fromSite: true });
@@ -119,10 +132,12 @@
       const a = await FRC.floodAnalysis.analyseSite(features, nation);
       if (seq !== state.analysisSeq) return; // the boundary changed while we waited
       state.analysis = a;
-      FRC.results.renderAnalysis($("analysis"), a);
+      state.analysing = false;
+      renderDashboard();
       FRC.map.showAnalysis(a);
+      $("dashCard").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
-      if (seq === state.analysisSeq) $("analysis").innerHTML = `<p class="msg bad">${esc("The site analysis could not be completed: " + e.message)}</p>`;
+      if (seq === state.analysisSeq) { state.analysing = false; state.analysisError = e.message; renderDashboard(); }
     } finally {
       $("siteCheckBtn").disabled = !state.site.features.length;
     }
@@ -183,6 +198,7 @@
     $("importInput").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ""; });
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
     $("siteCheckBtn").addEventListener("click", runSiteCheck);
+    $("siteName").addEventListener("input", renderDashboard);
     $("siteInfo").addEventListener("click", (e) => {
       const z = e.target.closest("[data-zoom]"), r = e.target.closest("[data-remove]");
       const layers = FRC.boundaryDraw.layers();

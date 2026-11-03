@@ -17,7 +17,7 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 | | Import GeoJSON, KML or a zipped Shapefile. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |
 | 3. Results | **Analyse site** intersects the boundary with each flood dataset. The results dashboard has five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
-| 4. Report | PDF with the sections you tick, data status, sources and limitations |
+| 4. Report | PDF in the spec's structure, one section per page: 1 executive summary (with a findings-at-a-glance table), 2 site location plan, 3 site boundary and measurements, 4 flood-zone assessment with a flood-zone map, 5 spatial intersection tables, 6 additional flood information, 7 warnings and gauges, 8 data status with retrieval times, sources, methodology, limitations and disclaimer. Company name and logo (remembered in this browser), reference and analyst on every page |
 
 The **Data connections** panel tests each public service when the page opens.
 

@@ -14,7 +14,20 @@
     analysisSeq: 0,
     analysing: false,
     analysisError: null,
+    logo: null,         // company logo for the PDF, as a data URL
   };
+
+  // Company name and logo are remembered in this browser only. Storage can be
+  // unavailable (private windows), so every access is guarded.
+  const store = {
+    get(k) { try { return localStorage.getItem("frc." + k); } catch { return null; } },
+    set(k, v) { try { if (v == null || v === "") localStorage.removeItem("frc." + k); else localStorage.setItem("frc." + k, v); } catch { /* not saved */ } },
+  };
+  function setLogo(dataUrl, label) {
+    state.logo = dataUrl || null;
+    $("logoClear").hidden = !state.logo;
+    $("logoMsg").textContent = state.logo ? label || "Logo added." : "";
+  }
   FRC.state = state;
 
   // ---------- Results dashboard ----------
@@ -210,13 +223,28 @@
       const btn = $("pdfBtn"); btn.disabled = true; btn.textContent = "Building PDF…";
       try {
         await FRC.pdfReport.build(state.current, state.site, state.analysis, {
+          company: $("company").value.trim(), logo: state.logo,
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), notes: $("notes").value.trim(),
-          sections: { location: $("o-location").checked, map: $("o-map").checked, site: $("o-site").checked, intersect: $("o-intersect").checked, zone: $("o-zone").checked, band: $("o-band").checked, live: $("o-live").checked, gauges: $("o-gauges").checked },
+          sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         });
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
       btn.disabled = false; btn.textContent = "Download PDF report";
     });
     $("checkBtn").addEventListener("click", testConnections);
+
+    $("company").value = store.get("company") || "";
+    $("company").addEventListener("input", () => store.set("company", $("company").value.trim()));
+    if (store.get("logo")) setLogo(store.get("logo"), "Saved logo will be used.");
+    $("logoInput").addEventListener("change", (e) => {
+      const f = e.target.files[0]; e.target.value = "";
+      if (!f) return;
+      if (!/^image\/(png|jpeg)$/.test(f.type)) { $("logoMsg").textContent = "Use a PNG or JPG image."; return; }
+      if (f.size > 500 * 1024) { $("logoMsg").textContent = "That image is over 500 KB. Use a smaller one."; return; }
+      const r = new FileReader();
+      r.onload = () => { setLogo(r.result, "Logo added: " + f.name); store.set("logo", r.result); };
+      r.readAsDataURL(f);
+    });
+    $("logoClear").addEventListener("click", () => { setLogo(null); store.set("logo", null); });
 
     recomputeSite();
     testConnections();

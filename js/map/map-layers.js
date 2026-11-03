@@ -64,6 +64,7 @@
         if (close) close.addEventListener("click", () => { setOpen(false); toggle.focus(); });
         document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !legend.hidden) { setOpen(false); toggle.focus(); } });
       }
+      FRC.mapLayers.layers = layers;
       return layers;
     },
   };

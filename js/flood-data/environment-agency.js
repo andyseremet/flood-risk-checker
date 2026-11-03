@@ -39,19 +39,26 @@
       const url = `${wmsUrl}?service=WMS&request=GetFeatureInfo&layers=${layer}&query_layers=${layer}&styles=&${q}&width=101&height=101&info_format=application/json&feature_count=5&buffer=3`;
       // One retry: the surface water service sometimes drops a request.
       for (let attempt = 1; attempt <= 2; attempt++) {
-        const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
         try {
-          const res = await fetch(url, { signal: ctrl.signal });
-          const text = await res.text();
-          if (!res.ok) throw new Error("HTTP " + res.status);
+          const text = await FRC.util.limited(async () => {
+            const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
+            try {
+              const res = await fetch(url, { signal: ctrl.signal });
+              const body = await res.text();
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              return body;
+            } finally { clearTimeout(timer); }
+          });
           const r = parseInfo(text);
           tried.push({ system, features: r.count, ...(r.count ? {} : { sample: text.slice(0, 120) }) });
           if (r.props) return { props: r.props, format: system, tried };
           break;
         } catch (e) {
           lastError = e.name === "AbortError" ? new Error("timed out after 15 s") : e;
+          lastError.url = url;
           if (attempt === 2) tried.push({ system, error: lastError.message.slice(0, 160) });
-        } finally { clearTimeout(timer); }
+          else await new Promise((r) => setTimeout(r, 1500));
+        }
       }
     }
     if (tried.every((t) => t.error)) throw lastError;

@@ -45,14 +45,15 @@
         if (open) {
           if (retried) open.tries++;
           open.message = f.message || open.message;
-        } else entries.unshift({ key: f.key, what: f.what, message: f.message || "", at: now, tries: 0, fixed: null, once: false });
+          open.url = f.url || open.url;
+        } else entries.unshift({ key: f.key, what: f.what, message: f.message || "", url: f.url || null, at: now, tries: 0, fixed: null, once: false });
       });
       render();
     },
 
     // A one-off problem that Try again cannot fix (for example a postcode lookup).
-    note(what, message) {
-      entries.unshift({ key: "once:" + Date.now(), what, message: message || "", at: new Date(), tries: 0, fixed: null, once: true });
+    note(what, message, url) {
+      entries.unshift({ key: "once:" + Date.now(), what, message: message || "", url: url || null, at: new Date(), tries: 0, fixed: null, once: true });
       render();
     },
 
@@ -60,12 +61,15 @@
 
     text() {
       const lines = [`Flood Risk Checker ${root.FRC_VERSION || ""} error log, copied ${new Date().toLocaleString("en-GB")}`,
-        `Browser: ${(root.navigator && root.navigator.userAgent) || "unknown"}`, ""];
+        `Browser: ${(root.navigator && root.navigator.userAgent) || "unknown"}`];
+      if (FRC.util && FRC.util.net) { const n = FRC.util.net(); lines.push(`Requests: ${n.retried} retried automatically, ${n.cached} answered from saved results`); }
+      lines.push("");
       if (!entries.length) lines.push("No errors.");
       entries.slice().reverse().forEach((e) => {
         lines.push(`${hhmmss(e.at)}  ${e.what}`);
         if (e.message) lines.push(`  Message: ${e.message}`);
         const h = hint(e.message); if (h) lines.push(`  Hint: ${h}`);
+        if (e.url) lines.push(`  Request: ${e.url}`);
         if (e.tries) lines.push(`  Tried again: ${e.tries} time${e.tries === 1 ? "" : "s"}`);
         lines.push("  Status: " + (e.fixed ? `${e.fixedHow} at ${hhmmss(e.fixed)}` : e.once ? "Not retried (run it again yourself)" : "Still failing"));
       });
@@ -89,6 +93,7 @@
       return `<li class="${e.fixed ? "fixed" : ""}"><div class="err-head"><span class="mono">${hhmmss(e.at)}</span> <strong>${esc(e.what)}</strong> ${status}</div>` +
         (e.message ? `<div class="err-msg mono">${esc(e.message)}</div>` : "") +
         (h ? `<div class="err-hint">${esc(h)}</div>` : "") +
+        (/^https:\/\//.test(e.url || "") ? `<div class="err-link"><a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">Open the request</a> <span class="hint">to see what the service returns</span></div>` : "") +
         (e.fixed ? `<div class="err-hint">${esc(e.fixedHow)} at ${hhmmss(e.fixed)}${e.tries ? ` (tried ${e.tries} time${e.tries === 1 ? "" : "s"})` : ""}.</div>`
           : e.tries ? `<div class="err-hint">Tried again ${e.tries} time${e.tries === 1 ? "" : "s"}.</div>` : "") + `</li>`;
     }).join("");

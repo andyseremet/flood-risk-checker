@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="assets/css/style.css?v=1.4.0">
+<link rel="stylesheet" href="assets/css/style.css?v=1.5.0">
 </head>
 <body>
 <div class="progress" id="progress" role="progressbar" aria-label="Loading flood data" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
@@ -90,10 +90,13 @@
       <p class="hint">Shows whether this browser can reach each public service.</p>
       <ul class="checks" id="checks"></ul>
       <div class="row"><button type="button" class="ghost" id="checkBtn">Test connections</button></div>
+      <p class="hint">Connections are tested again before a check when the last test is over 5 minutes old. A service that takes over 5 seconds is marked Slow.</p>
+      <p class="hint">To cut errors, the app tries a failed request again by itself (up to twice), runs at most 4 requests at once, and reuses map data fetched in the last hour. Pressing Check always fetches fresh data.</p>
+      <div class="row"><button type="button" class="ghost" id="cacheClear">Clear saved results</button><span class="hint" id="cacheMsg" role="status"></span></div>
     </section>
     </details>
 
-    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.4.0.</span></footer>
+    <footer class="note">Contains Environment Agency, Natural Resources Wales and SEPA data under the Open Government Licence v3.0. Postcode data from postcodes.io (ONS, OS). Map data © OpenStreetMap contributors. Preliminary screening only, not a Flood Risk Assessment. Not for safety-critical use. <span class="nowrap">Version 1.5.0.</span></footer>
   </div>
   <div id="mapwrap">
    <div id="mapbox">
@@ -145,7 +148,7 @@
         <button type="button" id="pdfBtn" disabled>Download PDF report</button>
         <button type="button" class="ghost" id="exportBtn" disabled>Export GeoJSON</button>
         <button type="button" class="ghost" id="clearBtn" disabled>Clear all</button>
-        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service and a hint. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
+        <button type="button" class="info" aria-expanded="false" aria-controls="help-bar" title="Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map." aria-label="What these buttons do">i</button>
       </div>
       <div class="errlog-panel" id="errLogPanel" role="region" aria-label="Error log" hidden>
         <div class="errlog-head">
@@ -161,8 +164,9 @@
         <p class="hint" id="errLogSummary"></p>
         <ol class="errlog-list" id="errLogList"></ol>
       </div>
-      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service and a hint. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
+      <p class="help" id="help-bar" hidden>Check runs every flood check for the site and fills in the results. The round arrow button appears only when something failed: it tries again for those parts and keeps the results that worked. Problems opens the error log: what failed, when, the message from the service, a hint and a link to open the exact request. Copy log copies it to share. Download PDF report builds the report from the latest check. Export GeoJSON saves the site boundary as a file. Clear all removes the site from the map.</p>
       <p class="hint" id="status" role="status"></p>
+      <p class="msg warn net-warn" id="netWarnBox" role="status" hidden><span id="netWarn"></span><button type="button" id="netWarnClose" aria-label="Hide this warning" title="Hide">×</button></p>
     </div>
   </div>
 </main>
@@ -176,30 +180,30 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- App modules (plain scripts so the page also works when opened as a local file) -->
-<script>window.FRC_VERSION = "1.4.0";</script>
-<script src="js/config.js?v=1.4.0"></script>
-<script src="js/util.js?v=1.4.0"></script>
-<script src="js/progress.js?v=1.4.0"></script>
-<script src="js/error-log.js?v=1.4.0"></script>
-<script src="js/geometry/projections.js?v=1.4.0"></script>
-<script src="js/geometry/measurements.js?v=1.4.0"></script>
-<script src="js/boundary/boundary-validation.js?v=1.4.0"></script>
-<script src="js/boundary/boundary-import.js?v=1.4.0"></script>
-<script src="js/boundary/boundary-export.js?v=1.4.0"></script>
-<script src="js/map/map.js?v=1.4.0"></script>
-<script src="js/map/map-layers.js?v=1.4.0"></script>
-<script src="js/boundary/boundary-draw.js?v=1.4.0"></script>
-<script src="js/location/location-search.js?v=1.4.0"></script>
-<script src="js/flood-data/environment-agency.js?v=1.4.0"></script>
-<script src="js/flood-data/natural-resources-wales.js?v=1.4.0"></script>
-<script src="js/flood-data/sepa.js?v=1.4.0"></script>
-<script src="js/flood-data/data-normalisation.js?v=1.4.0"></script>
-<script src="js/analysis/intersections.js?v=1.4.0"></script>
-<script src="js/analysis/compute.js?v=1.4.0"></script>
-<script src="js/analysis/flood-analysis.js?v=1.4.0"></script>
-<script src="js/dashboard/results.js?v=1.4.0"></script>
-<script src="js/reporting/assessment.js?v=1.4.0"></script>
-<script src="js/reporting/pdf-report.js?v=1.4.0"></script>
-<script src="js/app.js?v=1.4.0"></script>
+<script>window.FRC_VERSION = "1.5.0";</script>
+<script src="js/config.js?v=1.5.0"></script>
+<script src="js/util.js?v=1.5.0"></script>
+<script src="js/progress.js?v=1.5.0"></script>
+<script src="js/error-log.js?v=1.5.0"></script>
+<script src="js/geometry/projections.js?v=1.5.0"></script>
+<script src="js/geometry/measurements.js?v=1.5.0"></script>
+<script src="js/boundary/boundary-validation.js?v=1.5.0"></script>
+<script src="js/boundary/boundary-import.js?v=1.5.0"></script>
+<script src="js/boundary/boundary-export.js?v=1.5.0"></script>
+<script src="js/map/map.js?v=1.5.0"></script>
+<script src="js/map/map-layers.js?v=1.5.0"></script>
+<script src="js/boundary/boundary-draw.js?v=1.5.0"></script>
+<script src="js/location/location-search.js?v=1.5.0"></script>
+<script src="js/flood-data/environment-agency.js?v=1.5.0"></script>
+<script src="js/flood-data/natural-resources-wales.js?v=1.5.0"></script>
+<script src="js/flood-data/sepa.js?v=1.5.0"></script>
+<script src="js/flood-data/data-normalisation.js?v=1.5.0"></script>
+<script src="js/analysis/intersections.js?v=1.5.0"></script>
+<script src="js/analysis/compute.js?v=1.5.0"></script>
+<script src="js/analysis/flood-analysis.js?v=1.5.0"></script>
+<script src="js/dashboard/results.js?v=1.5.0"></script>
+<script src="js/reporting/assessment.js?v=1.5.0"></script>
+<script src="js/reporting/pdf-report.js?v=1.5.0"></script>
+<script src="js/app.js?v=1.5.0"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@
   const FRC = (root.FRC = root.FRC || {});
   const { fmtDate, fmtNum } = FRC.util;
 
-  const INK = [20, 35, 43], MUTED = [85, 112, 121], ACCENT = [11, 110, 138], LINE = [213, 224, 227], HEAD_BG = [234, 242, 244];
+  const INK = [20, 35, 43], WARN_INK = [150, 80, 0], MUTED = [85, 112, 121], ACCENT = [11, 110, 138], LINE = [213, 224, 227], HEAD_BG = [234, 242, 244];
 
   // Public sources, in the order they are listed in section 8.
   const SOURCES = [
@@ -46,6 +46,7 @@
       const doc = new jsPDF({ unit: "mm", format: "a4" });
       const W = 210, M = 16, CW = W - 2 * M, TOP = 24, BOTTOM = 278;
       const S = opts.sections;
+      const gaps = opts.gaps || [];
       const hasSite = Boolean(site && site.features.length && site.measured);
       const p = (res && res.place) || {};
       const nation = (res && res.nation) || (analysis && analysis.nation) || "Unknown";
@@ -171,6 +172,7 @@
       fra.reasons.forEach((t) => para("•  " + t, 9.5));
       doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); ensure(6); doc.text("Next steps", M, y + 4); y += 6;
       fra.actions.forEach((t, i) => para(`${i + 1}.  ${t}`, 9.5));
+      if (gaps.length) para(`Data gaps: ${gaps.length} part${gaps.length === 1 ? "" : "s"} of the check returned no full result, so ${gaps.length === 1 ? "it is" : "they are"} not reflected here. See Data gaps in section 8.`, 9.5, WARN_INK);
       note("Guidance: " + fra.links.join("  ·  ") + ". This is a screening indication. The local planning authority decides whether an assessment is needed.");
       const climate = A.climateNote(nation);
       note(climate.text + " " + climate.link);
@@ -336,6 +338,12 @@
       if (res) FRC.results.dataStatus(res).forEach((r) => status.push([r.name + (res.fromSite ? " (site centroid)" : " (point)"), r.status[1], r.when ? fmtDate(r.when) : "-"]));
       if (status.length) table([{ title: "Dataset", width: 82 }, { title: "Status", width: 54 }, { title: "Retrieved", width: CW - 136 }], status);
       else note("No data was retrieved.");
+      h3("Data gaps");
+      if (gaps.length) {
+        para(`${gaps.length} part${gaps.length === 1 ? "" : "s"} of the check did not return a full result when this report was made. The findings above do not include ${gaps.length === 1 ? "it" : "them"}.`, 9.5);
+        table([{ title: "Part", width: 62 }, { title: "Problem", width: 58 }, { title: "What it means", width: CW - 120 }],
+          gaps.map((g) => [g.what, String(g.message || "").slice(0, 160), (FRC.errorLog && FRC.errorLog.hint(g.message)) || "Run the check again before relying on this part."]));
+      } else note("None. Every part of the check returned a result.");
       h3("Data sources");
       table([{ title: "Data", width: 40 }, { title: "Source", width: 70 }, { title: "Reference", width: CW - 110 }], SOURCES.map((s) => s));
       note("Contains Environment Agency information © Environment Agency and database right. Contains Natural Resources Wales information © Natural Resources Wales and Database Right. All rights Reserved. Contains SEPA data © Scottish Environment Protection Agency. All used under the Open Government Licence v3.0. This uses Environment Agency flood and river level data from the real-time data API (Beta). Map data © OpenStreetMap contributors.");
@@ -352,6 +360,7 @@
         "Flood levels, ground levels and floor levels (mAOD), flood defences, residual risk, safe access and drainage are not assessed. A full Flood Risk Assessment covers them.",
         "Results show present-day risk unless stated. Climate change allowances are not applied.",
         "Northern Ireland is not covered.",
+        "To reduce errors, results may be reused from this browser for up to 60 minutes. Pressing Check always fetches fresh data.",
       ].forEach((t) => para("•  " + t, 9.5));
       note(`Generated with Flood Risk Checker version ${root.FRC_VERSION || "unknown"}, using only free, open data under the licences above.`);
       h3("Disclaimer");

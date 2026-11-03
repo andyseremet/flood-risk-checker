@@ -151,12 +151,13 @@
       return null;
     }
     $("status").textContent = "Checking flood data…";
+    precheck();
     FRC.map.showPoint(lat, lon, dist, { fit: !fromSite });
 
     if (!place) place = await FRC.progress.track(FRC.location.reverseLookup(lat, lon), "Finding the place");
     if (stale()) return null;
     const nation = FRC.location.nationOf(place);
-    const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {} };
+    const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {}, errorUrls: {} };
 
     await Promise.all(pointJobs(res).map((t) => FRC.progress.track(t.run(), t.label).catch(() => {})));
     // A later map click or postcode search takes precedence over this response.
@@ -176,7 +177,7 @@
     const { lat, lon, dist, nation } = res;
     const isEng = nation === "England", isWal = nation === "Wales", isSco = nation === "Scotland", unknown = nation === "Unknown";
     const jobs = [];
-    const job = (key, label, fn) => jobs.push({ key, label, run: () => fn().catch((e) => { res.errors[key] = e.message; throw e; }) });
+    const job = (key, label, fn) => jobs.push({ key, label, run: () => fn().catch((e) => { res.errors[key] = e.message; (res.errorUrls = res.errorUrls || {})[key] = e.url || null; throw e; }) });
     if (isEng || unknown) job("zone", "Flood zone at the point (England)", () => FRC.ea.zoneAtPoint(lat, lon).then((v) => { if (isEng || v.zone) res.zone = { kind: "england", ...v }; }));
     if (isWal || unknown) job("zone", "Flood zone at the point (Wales)", () => FRC.nrw.zoneAtPoint(lat, lon).then((v) => { if (isWal || v.hits.length) res.zone = { kind: "wales", ...v }; }));
     if (isSco || unknown) job("zone", "Flood maps at the point (Scotland)", () => FRC.sepa.floodAtPoint(lat, lon).then((v) => { if (isSco || Object.keys(v.found).length) res.zone = { kind: "scotland", ...v }; }));
@@ -203,11 +204,11 @@
     [[state.current, "pt", "Point"], [state.siteCheck, "site", "Site centre"]].forEach(([res, tag, where]) => {
       if (!res) return;
       const jobs = pointJobs(res);
-      failedPoint(res).forEach((k) => { const j = jobs.find((x) => x.key === k); out.push({ key: `${tag}:${k}`, what: `${where}: ${j ? j.label : k}`, message: res.errors[k] }); });
+      failedPoint(res).forEach((k) => { const j = jobs.find((x) => x.key === k); out.push({ key: `${tag}:${k}`, what: `${where}: ${j ? j.label : k}`, message: res.errors[k], url: (res.errorUrls || {})[k] }); });
     });
-    failedAnalysis().forEach((d) => out.push({ key: "ds:" + d.id, what: "Site: " + d.name, message: d.error || (d.status === "partial" ? "Only part of the data came back. " + (d.notes || []).join(" ") : d.statusText) }));
+    failedAnalysis().forEach((d) => out.push({ key: "ds:" + d.id, what: "Site: " + d.name, message: d.error || (d.status === "partial" ? "Only part of the data came back. " + (d.notes || []).join(" ") : d.statusText), url: d.errorUrl }));
     if (state.analysisError) out.push({ key: "analysis", what: "Site analysis", message: state.analysisError });
-    failedConnections().forEach((i) => out.push({ key: "conn:" + i, what: "Connection: " + CHECKS[i][0], message: $("chk" + i).title }));
+    failedConnections().forEach((i) => out.push({ key: "conn:" + i, what: "Connection: " + CHECKS[i][0], message: $("chk" + i).title, url: $("chk" + i).dataset.url || null }));
     failedTiles().forEach((k) => out.push({ key: "tile:" + k, what: "Map layer: " + FRC.mapLayers.tileErrors[k], message: "Some map tiles did not load." }));
     return out;
   }
@@ -308,7 +309,7 @@
     } catch (e) {
       const notFound = /404/.test(e.message);
       $("status").textContent = notFound ? "That postcode was not found. Check it and try again." : "Could not reach the postcode service. Try again, or click the map instead.";
-      if (!notFound) FRC.errorLog.note("Postcode lookup: " + pc, e.message);
+      if (!notFound) FRC.errorLog.note("Postcode lookup: " + pc, e.message, e.url);
     }
   }
 
@@ -324,18 +325,50 @@
     ["Flood zones (Natural Resources Wales)", () => FRC.nrw.zoneAtPoint(51.62, -3.94)],
     ["Flood maps (SEPA)", () => FRC.sepa.floodAtPoint(56.396, -3.437)],
   ];
+  const SLOW_S = 5;
+  // A short warning under the map when a service is blocked or slow, so the
+  // user knows before the results come back.
+  function showNetWarning() {
+    const el = $("netWarn");
+    if (!el) return;
+    const blocked = [], slow = [];
+    CHECKS.forEach((c, i) => { const p = $("chk" + i); if (!p) return; if (p.classList.contains("bad")) blocked.push(c[0]); else if (p.dataset.slow) slow.push(`${c[0]} (${p.dataset.slow} s)`); });
+    const parts = [];
+    if (blocked.length) parts.push(`Not reachable right now: ${blocked.join(", ")}. Results from ${blocked.length === 1 ? "it" : "them"} may be missing.`);
+    if (slow.length) parts.push(`Slow right now: ${slow.join(", ")}. The check may take longer.`);
+    el.textContent = parts.join(" ");
+    $("netWarnBox").hidden = !parts.length;
+  }
+  // Before a check, test the connections again if the last test is over
+  // PRECHECK_MIN minutes old. It runs alongside the check, not before it.
+  const PRECHECK_MIN = 5;
+  function precheck() {
+    if (state.connTestedAt && Date.now() - state.connTestedAt < PRECHECK_MIN * 60000) return;
+    testConnections();
+  }
   // only: indexes of the checks to run again (the others keep their result).
   async function testConnections(only) {
     const ul = $("checks");
     if (!only || !ul.children.length) ul.innerHTML = CHECKS.map((c, i) => `<li><span>${esc(c[0])}</span><span class="pill neutral" id="chk${i}">Testing</span></li>`).join("");
     const which = only || CHECKS.map((c, i) => i);
-    await Promise.all(which.map(async (i) => {
+    state.connTestedAt = Date.now();
+    // Tested without remembered results, and timed: a service that takes
+    // longer than SLOW_S seconds is marked Slow.
+    await FRC.util.fresh(() => Promise.all(which.map(async (i) => {
       const c = CHECKS[i], el = $("chk" + i);
-      el.className = "pill neutral"; el.textContent = "Testing"; el.title = "";
-      try { await c[1](); el.className = "pill info"; el.textContent = "Working"; }
-      catch (e) { el.className = "pill bad"; el.textContent = "Blocked"; el.title = e.message; }
-    }));
+      el.className = "pill neutral"; el.textContent = "Testing"; el.title = ""; delete el.dataset.url; delete el.dataset.slow;
+      const t0 = Date.now();
+      try {
+        await c[1]();
+        const secs = (Date.now() - t0) / 1000;
+        const slow = secs > SLOW_S;
+        el.className = slow ? "pill warn" : "pill info"; el.textContent = slow ? "Slow" : "Working";
+        el.title = `Answered in ${secs.toFixed(1)} s`;
+        if (slow) el.dataset.slow = secs.toFixed(1);
+      } catch (e) { el.className = "pill bad"; el.textContent = "Blocked"; el.title = e.message; if (e.url) el.dataset.url = e.url; }
+    })));
     updateRetry();
+    showNetWarning();
     // The panel is folded away; open it when a service cannot be reached.
     const blocked = ul.querySelectorAll(".pill.bad").length;
     const panel = ul.closest("details");
@@ -392,9 +425,13 @@
     $("clearBtn").addEventListener("click", () => FRC.boundaryDraw.clear());
     $("importInput").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ""; });
     $("exportBtn").addEventListener("click", () => FRC.boundaryExport.download(state.site.features, state.site.measured, $("siteName").value.trim()));
-    $("siteCheckBtn").addEventListener("click", runSiteCheck);
+    // Check always asks the services again; pin drops and edits may reuse
+    // results remembered from the last hour.
+    $("siteCheckBtn").addEventListener("click", () => FRC.util.fresh(runSiteCheck));
+    $("cacheClear").addEventListener("click", () => { FRC.util.cache.clear(); $("cacheMsg").textContent = "Saved results cleared."; });
     $("retryBtn").addEventListener("click", retryFailed);
     $("errLogRetry").addEventListener("click", retryFailed);
+    $("netWarnClose").addEventListener("click", () => { $("netWarnBox").hidden = true; });
     FRC.errorLog.init();
     FRC.mapLayers.onTileError = updateRetry;
     $("siteName").addEventListener("input", renderDashboard);
@@ -413,6 +450,7 @@
         await FRC.progress.track(FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
           company: $("company").value.trim(), logo: state.logo,
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), checkedBy: $("checkedBy").value.trim(), version: $("version").value.trim(), notes: $("notes").value.trim(),
+          gaps: failingParts().filter((g) => !/^(tile|conn):/.test(g.key)),
           sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
         }), "Building the PDF report");
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }

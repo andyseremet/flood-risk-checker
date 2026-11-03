@@ -68,7 +68,7 @@
     const [lon, lat] = centroid;
     let r;
     try { r = await ds.check(lat, lon); } catch (e) {
-      return { ...out, status: "unavailable", statusText: STATUS.unavailable, error: e.message };
+      return { ...out, status: "unavailable", statusText: STATUS.unavailable, error: e.message, errorUrl: e.url || null };
     }
     out.retrieved = r.retrieved;
     out.band = r.band || null;
@@ -84,7 +84,7 @@
     const out = { id: ds.id, nation: ds.nation, name: ds.name, primary: Boolean(ds.primary), noneText: ds.noneText, groups: [], notes: [], retrieved: null };
     let fetched;
     try { fetched = await ds.fetch(box); } catch (e) {
-      return { ...out, status: "unavailable", statusText: STATUS.unavailable, error: e.message };
+      return { ...out, status: "unavailable", statusText: STATUS.unavailable, error: e.message, errorUrl: e.url || null };
     }
     out.retrieved = fetched.retrieved;
     try {

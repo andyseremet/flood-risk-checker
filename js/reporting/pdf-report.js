@@ -103,10 +103,11 @@
         rows.forEach((r) => drawRow(r, false));
         y += 3;
       };
+      let mapCount = 0;
       const mapImage = async (snap, caption) => {
         if (!S.maps) return;
         try {
-          const shot = await FRC.map.snapshot(snap);
+          const shot = await (FRC.progress ? FRC.progress.track(FRC.map.snapshot(snap), "Drawing map image " + ++mapCount) : FRC.map.snapshot(snap));
           let w = CW, h = (CW * shot.h) / shot.w;
           if (h > 120) { w = (w * 120) / h; h = 120; }
           ensure(h + 8);

@@ -152,22 +152,23 @@
     $("status").textContent = "Checking flood data…";
     FRC.map.showPoint(lat, lon, dist, { fit: !fromSite });
 
-    if (!place) place = await FRC.progress.track(FRC.location.reverseLookup(lat, lon), "Finding the place…");
+    if (!place) place = await FRC.progress.track(FRC.location.reverseLookup(lat, lon), "Finding the place");
     if (stale()) return null;
     const nation = FRC.location.nationOf(place);
     const res = { lat, lon, place, nation, dist, fromSite, when: new Date(), zone: null, band: null, live: null, gauges: null, liveAt: null, errors: {} };
 
     const isEng = nation === "England", isWal = nation === "Wales", isSco = nation === "Scotland", unknown = nation === "Unknown";
     const tasks = [];
-    if (isEng || unknown) tasks.push(FRC.ea.zoneAtPoint(lat, lon).then((v) => { if (isEng || v.zone) res.zone = { kind: "england", ...v }; }).catch((e) => (res.errors.zone = e.message)));
-    if (isWal || unknown) tasks.push(FRC.nrw.zoneAtPoint(lat, lon).then((v) => { if (isWal || v.hits.length) res.zone = { kind: "wales", ...v }; }).catch((e) => (res.errors.zone = e.message)));
-    if (isSco || unknown) tasks.push(FRC.sepa.floodAtPoint(lat, lon).then((v) => { if (isSco || Object.keys(v.found).length) res.zone = { kind: "scotland", ...v }; }).catch((e) => (res.errors.zone = e.message)));
+    const job = (label, p) => tasks.push(FRC.progress.track(p, label).catch(() => {}));
+    if (isEng || unknown) job("Flood zone at the point (England)", FRC.ea.zoneAtPoint(lat, lon).then((v) => { if (isEng || v.zone) res.zone = { kind: "england", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
+    if (isWal || unknown) job("Flood zone at the point (Wales)", FRC.nrw.zoneAtPoint(lat, lon).then((v) => { if (isWal || v.hits.length) res.zone = { kind: "wales", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
+    if (isSco || unknown) job("Flood maps at the point (Scotland)", FRC.sepa.floodAtPoint(lat, lon).then((v) => { if (isSco || Object.keys(v.found).length) res.zone = { kind: "scotland", ...v }; }).catch((e) => { res.errors.zone = e.message; throw e; }));
     if (isEng || unknown) {
-      tasks.push(FRC.ea.riskBand(lat, lon).then((v) => (res.band = v)).catch((e) => (res.errors.band = e.message)));
-      tasks.push(FRC.ea.liveWarnings(lat, lon, dist).then((v) => { res.live = v; res.liveAt = new Date(); }).catch((e) => (res.errors.live = e.message)));
-      tasks.push(FRC.ea.nearbyGauges(lat, lon, dist).then((v) => { res.gauges = v; res.liveAt = res.liveAt || new Date(); }).catch((e) => (res.errors.gauges = e.message)));
+      job("Long-term risk band", FRC.ea.riskBand(lat, lon).then((v) => (res.band = v)).catch((e) => { res.errors.band = e.message; throw e; }));
+      job("Flood warnings", FRC.ea.liveWarnings(lat, lon, dist).then((v) => { res.live = v; res.liveAt = new Date(); }).catch((e) => { res.errors.live = e.message; throw e; }));
+      job("River gauges", FRC.ea.nearbyGauges(lat, lon, dist).then((v) => { res.gauges = v; res.liveAt = res.liveAt || new Date(); }).catch((e) => { res.errors.gauges = e.message; throw e; }));
     }
-    await Promise.all(tasks.map((t) => FRC.progress.track(t, "Checking flood data at the point…")));
+    await Promise.all(tasks);
     // A later map click or postcode search takes precedence over this response.
     if (stale()) return res;
 
@@ -215,7 +216,7 @@
     if (!FRC.location.isPostcode(pc)) { $("status").textContent = "That doesn't look like a UK postcode. Check it, for example YO1 7HH."; return; }
     $("status").textContent = "Looking up postcode…";
     try {
-      const place = await FRC.progress.track(FRC.location.lookupPostcode(pc), "Finding the postcode…");
+      const place = await FRC.progress.track(FRC.location.lookupPostcode(pc), "Finding the postcode");
       if (!place || !Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
         $("status").textContent = "The postcode service returned no usable location. Check the postcode and try again.";
         return;
@@ -299,15 +300,13 @@
       const btn = $("pdfBtn");
       if (state.building) return;
       state.building = true; btn.disabled = true; btn.textContent = "Building PDF…";
-      FRC.progress.add(1, "Building the PDF report…");
       try {
-        await FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
+        await FRC.progress.track(FRC.pdfReport.build(reportCheck(), state.site, state.analysis, {
           company: $("company").value.trim(), logo: state.logo,
           siteName: $("siteName").value.trim(), ref: $("ref").value.trim(), analyst: $("analyst").value.trim(), checkedBy: $("checkedBy").value.trim(), version: $("version").value.trim(), notes: $("notes").value.trim(),
           sections: { location: $("o-location").checked, site: $("o-site").checked, zone: $("o-zone").checked, intersect: $("o-intersect").checked, other: $("o-other").checked, live: $("o-live").checked, maps: $("o-maps").checked },
-        });
+        }), "Building the PDF report");
       } catch (e) { $("status").textContent = "Could not build the PDF: " + e.message; }
-      FRC.progress.tick();
       state.building = false; btn.disabled = !pdfReady(); btn.textContent = "Download PDF report";
     });
     $("checkBtn").addEventListener("click", testConnections);

@@ -344,7 +344,7 @@
   // A short warning under the map when a service is blocked or slow, so the
   // user knows before the results come back.
   let lastNetWarning = "";
-  function showNetWarning() {
+  function showNetWarning(quiet) {
     const blocked = [], slow = [];
     CHECKS.forEach((c, i) => { const p = $("chk" + i); if (!p) return; if (p.classList.contains("bad")) blocked.push(c[0]); else if (p.dataset.slow) slow.push(`${c[0]} (${p.dataset.slow} s)`); });
     const parts = [];
@@ -352,7 +352,7 @@
     if (slow.length) parts.push(`Slow right now: ${slow.join(", ")}. The check may take longer.`);
     // Shown briefly under the map and kept in the Log; never drawn over the map.
     const text = parts.join(" ");
-    if (text && text !== lastNetWarning) setStatus(text);
+    if (text && text !== lastNetWarning) { if (quiet) FRC.errorLog.info(text); else setStatus(text); }
     lastNetWarning = text;
   }
   // Before a check, test the connections again if the last test is over
@@ -363,7 +363,9 @@
     testConnections();
   }
   // only: indexes of the checks to run again (the others keep their result).
-  async function testConnections(only) {
+  // quiet: the background test at page open. Results go to the Data
+  // connections panel and the Log only; nothing pops up or opens.
+  async function testConnections(only, { quiet = false } = {}) {
     const ul = $("checks");
     if (!only || !ul.children.length) ul.innerHTML = CHECKS.map((c, i) => `<li><span>${esc(c[0])}</span><span class="pill neutral" id="chk${i}">Testing</span></li>`).join("");
     const which = only || CHECKS.map((c, i) => i);
@@ -384,11 +386,12 @@
       } catch (e) { el.className = "pill bad"; el.textContent = "Blocked"; el.title = e.message; if (e.url) el.dataset.url = e.url; }
     })));
     updateRetry();
-    showNetWarning();
-    // The panel is folded away; open it when a service cannot be reached.
+    showNetWarning(quiet);
+    // The panel is folded away; open it when a service cannot be reached
+    // (not for the quiet test at page open).
     const blocked = ul.querySelectorAll(".pill.bad").length;
     const panel = ul.closest("details");
-    if (panel) { panel.open = panel.open || blocked > 0; panel.querySelector("summary").textContent = blocked ? `Data connections: ${blocked} blocked` : "Data connections: all working"; }
+    if (panel) { panel.open = panel.open || (blocked > 0 && !quiet); panel.querySelector("summary").textContent = blocked ? `Data connections: ${blocked} blocked` : "Data connections: all working"; }
   }
 
   // ---------- Start ----------
@@ -497,7 +500,10 @@
     $("logoClear").addEventListener("click", () => { setLogo(null); store.set("logo", null); });
 
     recomputeSite();
-    testConnections();
+    // Test the data connections in the background once the page and map have
+    // loaded, so the test does not slow the first map images.
+    const bg = () => setTimeout(() => testConnections(undefined, { quiet: true }), 300);
+    if (document.readyState === "complete") bg(); else window.addEventListener("load", bg, { once: true });
   }
 
   FRC.app = { start, runCheck, runSiteCheck, searchPostcode, importFile, recomputeSite };

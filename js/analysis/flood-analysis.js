@@ -140,7 +140,9 @@
         if (d.kind === "none") return notAssessed(d, d.reason);
         if (!wanted.includes(d)) return notAssessed(d, `The site centroid is not in ${d.nation}.`);
         const job = d.kind === "point" ? runPointDataset(d, centroid) : runDataset(d, geoms, box);
-        return P ? P.track(job, "Measuring flood data across the site…") : job;
+        // A dataset that could not be fetched or measured shows as a step with no result.
+        const bad = (r) => r.status === "unavailable" || r.status === "error";
+        return P ? P.track(job.then((r) => (bad(r) ? Promise.reject(r) : r)), "Site: " + d.name.replace(/^(Environment Agency|Natural Resources Wales|SEPA) /, "").split(" (")[0]).catch((r) => r) : job;
       }));
       const notes = [];
       if (nation === "Northern Ireland") notes.push("Northern Ireland flood map data is not open, so the site cannot be analysed.");

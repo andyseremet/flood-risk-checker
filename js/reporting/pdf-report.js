@@ -4,6 +4,9 @@
 //   2 Site location plan           6 Additional flood information
 //   3 Site boundary and measurements 7 Flood warnings and river gauges
 //   4 Flood-zone assessment        8 Data sources, methodology and limitations
+// Page one also carries a document control box, a risk rating for each
+// source of flooding and whether a full Flood Risk Assessment is likely to be
+// needed (see js/reporting/assessment.js).
 // Findings are kept apart from missing or unavailable data: every dataset
 // shows its status, and a section with nothing to report says why.
 (function (root) {
@@ -37,7 +40,7 @@
 
     // res: last point check (may be null); site: { features, measured } (may be empty);
     // analysis: site-wide analysis (may be null);
-    // opts: { company, logo, siteName, ref, analyst, notes, sections: { location, site, zone, intersect, other, live, maps } }
+    // opts: { company, logo, siteName, ref, analyst, checkedBy, version, notes, sections: { location, site, zone, intersect, other, live, maps } }
     async build(res, site, analysis, opts) {
       const { jsPDF } = root.jspdf;
       const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -137,13 +140,38 @@
       if (p.postcode) kv("Postcode", p.postcode);
       if (centre) kv("Coordinates", `${centre[0].toFixed(6)}, ${centre[1].toFixed(6)}${hasSite ? " (site centroid)" : ""}`);
       if (opts.ref) kv("Report reference", opts.ref);
-      kv("Report date and time", fmtDate(when));
-      if (opts.analyst) kv("Prepared by", opts.analyst);
-      y += 2;
+      y += 1;
+
+      // Document control: version, date, who prepared and who checked it.
+      h3("Document control");
+      table([{ title: "Version", width: 22 }, { title: "Date", width: 42 }, { title: "Prepared by", width: 59 }, { title: "Checked by", width: CW - 123 }],
+        [[opts.version || "-", fmtDate(when), opts.analyst || "Not recorded", opts.checkedBy || "Not checked"]]);
+      if (!opts.checkedBy) note("This report has not been checked by a second person.");
 
       doc.setFont("helvetica", "bold"); doc.setFontSize(13); color(ACCENT); doc.text("Executive summary", M, y + 5); color(INK); y += 9;
       if (hasSite) para(`The site covers ${fmtNum(site.measured.area, 0)} m² (${fmtNum(site.measured.hectares, 2)} ha) in ${site.measured.parcels.length} parcel${site.measured.parcels.length > 1 ? "s" : ""}, with a perimeter of ${fmtNum(site.measured.perimeter, 0)} m.`);
       else para("No site boundary was defined. The results below are single-point checks at the location shown.");
+
+      // Risk by source of flooding, then the next step.
+      const A = FRC.assessment;
+      const risk = A.riskBySource({ analysis, res, nation });
+      h3("Risk by source of flooding");
+      table([{ title: "Source", width: 40 }, { title: "Rating", width: 30 }, { title: "Evidence", width: CW - 70 }], risk.map((r) => [r.source, r.rating, r.evidence]));
+      note("Ratings follow each agency's own classes: High is Flood Zone 3 or a high likelihood band, Medium is Flood Zone 2 or a medium band. None mapped means no mapped feature was found; it is not a confirmed low risk.");
+      const fra = A.fraNeed({ analysis, res, site, nation, rows: risk });
+      h3("Is a full Flood Risk Assessment needed?");
+      { // Answer in a shaded box so it stands out.
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
+        const lines = doc.splitTextToSize(fra.headline, CW - 6); const h = lines.length * 4.8 + 4;
+        ensure(h + 2); doc.setFillColor(HEAD_BG[0], HEAD_BG[1], HEAD_BG[2]); doc.rect(M, y, CW, h, "F");
+        color(INK); doc.text(lines, M + 3, y + 5.4); y += h + 2;
+      }
+      fra.reasons.forEach((t) => para("•  " + t, 9.5));
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); ensure(6); doc.text("Next steps", M, y + 4); y += 6;
+      fra.actions.forEach((t, i) => para(`${i + 1}.  ${t}`, 9.5));
+      note("Guidance: " + fra.links.join("  ·  ") + ". This is a screening indication. The local planning authority decides whether an assessment is needed.");
+      const climate = A.climateNote(nation);
+      note(climate.text + " " + climate.link);
 
       // Findings at a glance: one row per dataset, finding and status kept apart.
       const glance = [];
@@ -209,6 +237,7 @@
           h3(res.fromSite ? "Flood zone at the site centroid" : "Flood zone at the checked point");
           kv("Result", z.pill[1]); kv("Status", FRC.results.dataStatus(res)[0].status[1] + (res.zone && res.zone.retrieved ? `  (retrieved ${fmtDate(res.zone.retrieved)})` : ""));
           para(z.text, 9.5);
+          const cn = FRC.assessment.climateNote(nation); note(cn.text);
           if (res.band || res.errors.band) {
             h3("Long-term risk, rivers and sea (England)");
             if (res.errors.band) { kv("Status", "Service unavailable"); note(res.errors.band); }
@@ -245,6 +274,7 @@
             });
             d.notes.forEach((n) => note(n));
           });
+          note("Reading the classes: Flood Zone 3 is land with a 1% or greater chance of river flooding each year (1 in 100), or 0.5% or greater from the sea (1 in 200). Flood Zone 2 is between 0.1% and 1% a year from rivers (1 in 1,000 to 1 in 100). SEPA bands: high 10% a year (1 in 10), medium 0.5% (1 in 200), low 0.1% (1 in 1,000).");
           note("Method: the site boundary and each dataset's polygons were converted to British National Grid (EPSG:27700) and intersected. Polygons of the same class were merged so overlaps count once; where classes overlap, the area is counted once in the more severe class. Land with no mapped polygon is reported as such and is not classified as Flood Zone 1.");
         }
       }
@@ -316,8 +346,12 @@
         "Very large sites can reach a service's result limit; this is reported as Partial coverage.",
         "The British National Grid conversion uses a standard 7-parameter shift, accurate to a few metres.",
         "Groundwater flooding is not assessed: there is no open national dataset.",
+        "Sewer flooding is not assessed: records are held by the water companies and are not open.",
+        "Flood levels, ground levels and floor levels (mAOD), flood defences, residual risk, safe access and drainage are not assessed. A full Flood Risk Assessment covers them.",
+        "Results show present-day risk unless stated. Climate change allowances are not applied.",
         "Northern Ireland is not covered.",
       ].forEach((t) => para("•  " + t, 9.5));
+      note(`Generated with Flood Risk Checker version ${root.FRC_VERSION || "unknown"}, using only free, open data under the licences above.`);
       h3("Disclaimer");
       para(DISCLAIMER, 9.5);
 
@@ -328,7 +362,8 @@
         doc.setFont("helvetica", "normal"); doc.setFontSize(8); color(MUTED);
         if (i > 1) {
           doc.text([opts.company, "Flood risk screening report", siteLabel].filter(Boolean).join("  ·  "), M, 12);
-          if (opts.ref) doc.text(opts.ref, W - M, 12, { align: "right" });
+          const refText = [opts.ref, opts.version && "Version " + opts.version].filter(Boolean).join("  ·  ");
+          if (refText) doc.text(refText, W - M, 12, { align: "right" });
           doc.setDrawColor(LINE[0], LINE[1], LINE[2]); doc.line(M, 15, W - M, 15);
         }
         doc.text(`Preliminary screening, not a Flood Risk Assessment  ·  generated ${fmtDate(when)}`, M, 290);

@@ -16,8 +16,8 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 | 2. Site boundary | Draw polygons or rectangles, edit corners, delete, clear and redraw. Several parcels are supported |
 | | Import GeoJSON, KML or a zipped Shapefile. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |
-| 3. Results | **Analyse site** intersects the boundary with each flood dataset. The results dashboard has five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
-| 4. Report | PDF in the spec's structure, one section per page: 1 executive summary (with a findings-at-a-glance table), 2 site location plan, 3 site boundary and measurements, 4 flood-zone assessment with a flood-zone map, 5 spatial intersection tables, 6 additional flood information, 7 warnings and gauges, 8 data status with retrieval times, sources, methodology, limitations and disclaimer. Company name and logo (remembered in this browser), reference and analyst on every page |
+| 3. Results | **Analyse site** intersects the boundary with each flood dataset. The results dashboard opens with a **summary**: a risk rating for each source of flooding (rivers, sea, surface water, groundwater, sewers, reservoirs, historic floods) and whether a full Flood Risk Assessment is likely to be needed, with next steps and a note on climate change. Then five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
+| 4. Report | PDF in the spec's structure, one section per page: 1 executive summary (document control box with version, prepared by and checked by; risk by source of flooding; "Is a full Flood Risk Assessment needed?" with next steps; climate change note; findings-at-a-glance table), 2 site location plan, 3 site boundary and measurements, 4 flood-zone assessment with a flood-zone map, 5 spatial intersection tables, 6 additional flood information, 7 warnings and gauges, 8 data status with retrieval times, sources, methodology, limitations and disclaimer. Company name and logo (remembered in this browser), reference and version on every page |
 
 The **Data connections** panel tests each public service when the page opens.
 
@@ -61,6 +61,19 @@ These England datasets are shown as "Not assessed" for sites in Wales and Scotla
 
 Classifications are shown in one neutral colour. Colour is kept for data status (for example Service unavailable), never to suggest that a site is safe or unsafe.
 
+### Risk by source and the full FRA question
+
+`js/reporting/assessment.js` turns the dataset results into one rating per source of flooding, using each agency's own classes: **High** is Flood Zone 3 or a high likelihood band, **Medium** is Flood Zone 2 or a medium band, **Low** is a low band. A source with nothing mapped is rated **None mapped**, never Low or Flood Zone 1. Sources the app cannot check (groundwater, sewers, and some sources outside England) are rated **Not assessed** with the reason.
+
+The "Is a full Flood Risk Assessment needed?" answer uses the published triggers:
+
+- England ([GOV.UK](https://www.gov.uk/guidance/flood-risk-assessment-the-sequential-test-for-applicants)): Flood Zone 2 or 3, or a site of 1 ha or more, means likely. A surface water band, a reservoir extent or a recorded flood means one may be needed.
+- Wales (TAN15): Flood Zone 2 or 3 means a Flood Consequences Assessment is likely.
+- Scotland (SEPA): a medium or high likelihood river or coastal extent means likely; a low likelihood extent or surface water means one may be needed.
+- Northern Ireland: not covered, so the answer is "cannot tell".
+
+When a key service fails, the answer is "cannot tell". The report always says that the local planning authority makes the final decision.
+
 ## Validation
 
 A boundary is rejected, with a message saying why, when it is empty, has fewer than 3 corners, has zero area, crosses itself, or uses an unsupported coordinate system. Point and line shapes are ignored with a warning. Shapes outside the UK get a warning.
@@ -96,6 +109,7 @@ js/
   geometry/                     projections (Proj4js), measurements
   flood-data/                   environment-agency, natural-resources-wales, sepa, data-normalisation
   dashboard/results.js          results and data status panels
+  reporting/assessment.js       Risk by source, full FRA question, climate note
   reporting/pdf-report.js       PDF report
 tests/
   geometry.test.js              measurement and validation tests
@@ -130,7 +144,7 @@ npm install
 npm test
 ```
 
-The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon), check that invalid shapes are rejected, and check the flood-zone intersections (the 60/20/20 example, a site outside all zones, a whole site in Zone 3, overlapping polygons, overlapping parcels, a site with a hole, and SEPA likelihood bands). The site analysis tests replace the services with fixed responses and check the reservoir, recorded flood and surface water results, their statuses when nothing is mapped or a service is down, and the reasons given for datasets that are not assessed.
+The tests measure boundaries with known areas (a 100 m square in BNG, a square with a hole, a two-part polygon), check that invalid shapes are rejected, and check the flood-zone intersections (the 60/20/20 example, a site outside all zones, a whole site in Zone 3, overlapping polygons, overlapping parcels, a site with a hole, and SEPA likelihood bands). The site analysis tests replace the services with fixed responses and check the reservoir, recorded flood and surface water results, their statuses when nothing is mapped or a service is down, and the reasons given for datasets that are not assessed. The assessment tests check the risk ratings and the full FRA answer for England, Wales, Scotland and Northern Ireland, including sites with nothing mapped and a failed service.
 
 ## Known limitations
 

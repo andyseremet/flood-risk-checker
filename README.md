@@ -16,8 +16,7 @@ Use it at https://andyseremet.github.io/flood-risk-checker/ (once GitHub Pages i
 | 2. Site boundary | Draw polygons or rectangles, edit corners, delete, clear and redraw. Several parcels are supported |
 | | Import GeoJSON, KML or a zipped Shapefile. Export the boundary as GeoJSON |
 | | Area (m², hectares, acres), perimeter and centroid (latitude/longitude and British National Grid) |
-| 3. Site flood-zone analysis | **Analyse site** intersects the boundary with flood zone polygons and gives the area and % of the site in each zone, in a table and on the map |
-| | Flood zone, long-term risk band, live warnings and river gauges at the site centroid or a clicked point |
+| 3. Results | **Analyse site** intersects the boundary with each flood dataset. The results dashboard has five sections, each of which can be hidden: **A** site information, **B** flood-zone assessment (areas and % of the site, shaded on the map, plus the zone and risk band at the centroid), **C** additional flood information (surface water, reservoir, recorded floods, groundwater), **D** live warnings and river gauges with readings and times, **E** assessment status of every dataset |
 | 4. Report | PDF with the sections you tick, data status, sources and limitations |
 
 The **Data connections** panel tests each public service when the page opens.
@@ -59,6 +58,8 @@ This exact case is one of the automated tests.
 | Groundwater | Always "Not assessed": there is no open national groundwater flood dataset. |
 
 These England datasets are shown as "Not assessed" for sites in Wales and Scotland. Scotland's surface water extents are already part of the SEPA analysis.
+
+Classifications are shown in one neutral colour. Colour is kept for data status (for example Service unavailable), never to suggest that a site is safe or unsafe.
 
 ## Validation
 

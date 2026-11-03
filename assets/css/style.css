@@ -91,3 +91,20 @@ table.data tr.total td { font-weight: 700; border-bottom: 0; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
 [hidden] { display: none !important; }
 ul.hint { padding-left: 18px; margin: 4px 0 0; }
+/* Results dashboard: five sections (A to E) */
+.dashboard { display: flex; flex-direction: column; gap: 4px; }
+.dash-sec { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; }
+.dash-sec:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.dash-sec > summary { list-style: none; cursor: pointer; }
+.dash-sec > summary::-webkit-details-marker { display: none; }
+.dash-sec > summary::after { content: "Hide"; float: right; margin-top: -26px; font-size: 13px; color: var(--accent); }
+.dash-sec:not([open]) > summary::after { content: "Show"; }
+.dash-sec h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0 0 8px; padding-right: 48px; }
+.dash-letter { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-size: 12px; font-weight: 700; color: var(--accent-ink, #fff); background: var(--accent); flex: none; }
+.dash-sec .result:first-of-type { border-top: 0; padding-top: 0; }
+table.data.status td { vertical-align: top; }
+table.data.status td:nth-child(2) { width: 1%; }
+table.data.status .pill { white-space: normal; }
+.dashboard .pill { border-radius: 8px; text-align: center; }
+.dashboard .result .title .pill { flex: none; max-width: 45%; align-self: flex-start; }
+table.data.status td:nth-child(2) { width: 8.5em; }
